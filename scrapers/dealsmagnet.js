@@ -195,10 +195,10 @@ export default async function scrapeDealsMagnet(page = 1) {
 
     let originalUrl = 'N/A';
 
-    if (buyUrl) {
-      const resolvedUrl = await resolveOriginalUrl(browser, buyUrl);
-      originalUrl = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/','');
-    }
+    // if (buyUrl) {
+    //   const resolvedUrl = await resolveOriginalUrl(browser, buyUrl);
+    //   originalUrl = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/','');
+    // }
 
 
     const price = card.find('.card-DealPrice').text().replace(/\s+/g, ' ').trim() || 'N/A';
@@ -223,7 +223,7 @@ export default async function scrapeDealsMagnet(page = 1) {
       discount,
       store,
       image,
-      dealUrl: originalUrl,
+      dealUrl: buyUrl,
       posted_on: postedAgo,
     };
   });

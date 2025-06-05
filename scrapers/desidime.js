@@ -194,10 +194,10 @@ export default async function scrapeDesiDime(page = 1) {
 
     let originalUrl = 'N/A';
 
-    if (redirectUrl) {
-      const resolvedUrl = await resolveOriginalUrl(browser, redirectUrl);
-      originalUrl = sanitizeUrl(resolvedUrl);
-    }
+    // if (redirectUrl) {
+    //   const resolvedUrl = await resolveOriginalUrl(browser, redirectUrl);
+    //   originalUrl = sanitizeUrl(resolvedUrl);
+    // }
 
     const deal_id = generateDealId(title,store,originalUrl)
 
@@ -208,7 +208,7 @@ export default async function scrapeDesiDime(page = 1) {
       discount,
       store,
       image,
-      url: originalUrl,
+      url: redirectUrl,
       posted_on: posted,
     };
   });
