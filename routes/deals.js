@@ -4,6 +4,10 @@ import path from 'path';
 import desidime from '../scrapers/desidime.js';
 import dealsmagnet from '../scrapers/dealsmagnet.js';
 import db from '../firebase.js';
+import { getBrowser } from '../browser.js';
+
+
+const browser = await getBrowser();
 
 const router = express.Router();
 const CACHE_FILE_PATH = path.resolve('./cached_deals.json');
@@ -24,8 +28,13 @@ router.get('/', async (req, res) => {
     }
 
     // Scrape new deals
-    const desidimeDeals = await desidime(page);
-    const dealsmagnetDeals = await dealsmagnet(page);
+    // const desidimeDeals = await desidime(page);
+    // const dealsmagnetDeals = await dealsmagnet(page);
+    const [desidimeDeals, dealsmagnetDeals] = await Promise.all([
+      desidime(page),
+      dealsmagnet(page)
+    ]);
+    
     const scrapedDeals = [...desidimeDeals, ...dealsmagnetDeals];
 
     // Filter only new deals

@@ -3,8 +3,23 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
 import { URL } from 'url';
 import crypto from 'crypto'
+import { getBrowser } from '../browser.js';
 
 puppeteer.use(StealthPlugin());
+
+const browser = await getBrowser();
+  const tab = await browser.newPage();
+  await tab.setRequestInterception(true);
+
+  // Block unnecessary resources
+  tab.on('request', req => {
+    const blocked = ['image', 'stylesheet', 'font'];
+    if (blocked.includes(req.resourceType())) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
 
 /**
  * Helper to run async tasks with concurrency limit.
@@ -145,17 +160,18 @@ async function asyncPool(tasks, limit) {
 }
 
 export default async function scrapeDealsMagnet(page = 1) {
-  const browser = await puppeteer.launch({ 
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-   });
+  // const browser = await puppeteer.launch({ 
+  //   headless: 'new',
+  //   args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  //  });
 
   // const defaultPages = await browser.pages();
   // if (defaultPages.length > 0) {
   //   await defaultPages[0].close();
   // }
-  const tab = await browser.newPage();
+  // const tab = await browser.newPage();
 
+  
   await tab.goto(`https://www.dealsmagnet.com/new?page=${page}`, {
     waitUntil: 'networkidle2',
     timeout: 0,
@@ -173,16 +189,6 @@ export default async function scrapeDealsMagnet(page = 1) {
     const buyButton = card.find('button.buy-button');
     let buyUrl = 'N/A';
 
-    // if (buyButton.length > 0) {
-    //   const dataCode = buyButton.attr('data-code');
-    //   if (dataCode) {
-    //     buyUrl = `https://www.dealsmagnet.com/buy?${dataCode}`;
-    //   }
-    // } else {
-    //   const dealHref = card.find('p.card-text a.MainCardAnchore').attr('href') || '';
-    //   buyUrl = `https://www.dealsmagnet.com${dealHref}`;
-    // }
-
     if (buyButton.length > 0) {
       const dataCode = buyButton.attr('data-code');
       if (dataCode) {
@@ -193,7 +199,7 @@ export default async function scrapeDealsMagnet(page = 1) {
       buyUrl = dealHref.startsWith('http') ? dealHref : `https://www.dealsmagnet.com${dealHref}`;
     }
 
-    let originalUrl = 'N/A';
+    // let originalUrl = 'N/A';
 
     // if (buyUrl) {
     //   const resolvedUrl = await resolveOriginalUrl(browser, buyUrl);
@@ -214,7 +220,7 @@ export default async function scrapeDealsMagnet(page = 1) {
     // const postedAgo = card.find('.TimeDuration').text().trim() || 'N/A';
     const postedAgo = getISTTimestamp();
 
-    const deal_id = generateDealId(title,store,originalUrl)
+    const deal_id = generateDealId(title,store,buyUrl)
     return {
       deal_id,
       title,
@@ -230,7 +236,7 @@ export default async function scrapeDealsMagnet(page = 1) {
 
   const deals = await asyncPool(tasks, 5);
 
-  await browser.close();
+  // await browser.close();
 
   return deals;
 }

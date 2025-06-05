@@ -3,6 +3,21 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
 import { URL } from 'url';
 import crypto from 'crypto'
+import { getBrowser } from '../browser.js';
+
+const browser = await getBrowser();
+const tab = await browser.newPage();
+  await tab.setRequestInterception(true);
+
+  // Block unnecessary resources
+  tab.on('request', req => {
+    const blocked = ['image', 'stylesheet', 'font'];
+    if (blocked.includes(req.resourceType())) {
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
 
 puppeteer.use(StealthPlugin());
 
@@ -145,15 +160,15 @@ function getISTTimestamp() {
 
 
 export default async function scrapeDesiDime(page = 1) {
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  // const browser = await puppeteer.launch({
+  //   headless: 'new',
+  //   args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  // });
   // const defaultPages = await browser.pages();
   // if (defaultPages.length > 0) {
   //   await defaultPages[0].close();
   // }
-  const tab = await browser.newPage();
+  // const tab = await browser.newPage();
 
   await tab.goto(`https://www.desidime.com/new?page=${page}&deals_view=deal_grid_view`, {
     waitUntil: 'networkidle2',
@@ -192,7 +207,7 @@ export default async function scrapeDesiDime(page = 1) {
 
     const redirectUrl = el.find('div.getdeal a').attr('data-href');
 
-    let originalUrl = 'N/A';
+    // let originalUrl = 'N/A';
 
     // if (redirectUrl) {
     //   const resolvedUrl = await resolveOriginalUrl(browser, redirectUrl);
@@ -214,8 +229,6 @@ export default async function scrapeDesiDime(page = 1) {
   });
 
   const deals = await asyncPool(tasks, 5);
-
-  await browser.close();
-
+  // await tab.close();
   return deals;
 }
