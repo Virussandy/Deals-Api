@@ -145,7 +145,10 @@ function getISTTimestamp() {
 
 
 export default async function scrapeDesiDime(page = 1) {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
   // const defaultPages = await browser.pages();
   // if (defaultPages.length > 0) {
   //   await defaultPages[0].close();

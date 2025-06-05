@@ -145,7 +145,10 @@ async function asyncPool(tasks, limit) {
 }
 
 export default async function scrapeDealsMagnet(page = 1) {
-  const browser = await puppeteer.launch({ headless: false });
+  const browser = await puppeteer.launch({ 
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+   });
 
   // const defaultPages = await browser.pages();
   // if (defaultPages.length > 0) {
