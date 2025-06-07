@@ -1,19 +1,24 @@
 // browser.js
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-let browser;
+puppeteer.use(StealthPlugin());
 
 export const getBrowser = async () => {
-  if (!browser) {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
+  });
+
+  const pages = await browser.pages();
+  if (pages.length > 0) {
+    await pages[0].close();
   }
+
   return browser;
 };
