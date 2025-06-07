@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
 
     // 2. Check which deal IDs exist in the lightweight index
     const indexSnapshots = await Promise.all(
-      dealIds.map(id => db.collection('deal_index').doc(id).get())
+      dealIds.map(id => db.collection('deals').doc(id).get())
     );
 
     const newDeals = indexSnapshots
@@ -74,10 +74,7 @@ router.get('/', async (req, res) => {
     const batch = db.batch();
     for (const deal of newDeals) {
       const dealRef = db.collection('deals').doc(deal.deal_id);
-      const indexRef = db.collection('deal_index').doc(deal.deal_id);
-
       batch.set(dealRef, deal);
-      batch.set(indexRef, { exists: true }); // or just {}
     }
 
     await batch.commit();
