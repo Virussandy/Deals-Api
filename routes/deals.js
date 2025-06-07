@@ -7,7 +7,6 @@ import { resolveOriginalUrl, sanitizeUrl } from '../scrapers/utils.js';
 
 const router = express.Router();
 
-// Parallel pool function
 async function asyncPool(tasks, limit) {
   const results = [];
   const executing = new Set();
@@ -31,24 +30,39 @@ router.get('/', async (req, res) => {
   const page = parseInt(req.query.page) || 1;
 
   try {
-    const snapshot = await db.collection('deals').select().get();
-    const existingIds = new Set(snapshot.docs.map(doc => doc.id));
-    console.log(`✅ Loaded ${existingIds.size} existing deal IDs from Firestore`);
-
-    // No browser passed — handled inside scrapers
     const [desidimeDeals, dealsmagnetDeals] = await Promise.all([
       desidime(page),
-      dealsmagnet(page)
+      dealsmagnet(page),
     ]);
+
     const allDeals = [...(desidimeDeals || []), ...(dealsmagnetDeals || [])];
 
-    const newDeals = allDeals.filter(deal => deal?.deal_id && !existingIds.has(deal.deal_id));
+    // 1. Create map of deal_id -> deal
+    const dealMap = new Map();
+    const dealIds = [];
+
+    for (const deal of allDeals) {
+      if (deal?.deal_id) {
+        dealMap.set(deal.deal_id, deal);
+        dealIds.push(deal.deal_id);
+      }
+    }
+
+    // 2. Check which deal IDs exist in the lightweight index
+    const indexSnapshots = await Promise.all(
+      dealIds.map(id => db.collection('deal_index').doc(id).get())
+    );
+
+    const newDeals = indexSnapshots
+      .filter(snapshot => !snapshot.exists)
+      .map(snapshot => dealMap.get(snapshot.id));
+
     console.log(`🆕 ${newDeals.length} new deals to resolve and store`);
 
-    // Open browser for resolving URLs only
+    // 3. Resolve URLs in parallel
     const browser = await getBrowser();
 
-    await asyncPool(newDeals.map((deal) => async () => {
+    await asyncPool(newDeals.map(deal => async () => {
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
       deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
       delete deal.redirectUrl;
@@ -56,9 +70,17 @@ router.get('/', async (req, res) => {
 
     await browser.close();
 
+    // 4. Save to /deals and index to /deal_index
+    const batch = db.batch();
     for (const deal of newDeals) {
-      await db.collection('deals').doc(deal.deal_id).set(deal);
+      const dealRef = db.collection('deals').doc(deal.deal_id);
+      const indexRef = db.collection('deal_index').doc(deal.deal_id);
+
+      batch.set(dealRef, deal);
+      batch.set(indexRef, { exists: true }); // or just {}
     }
+
+    await batch.commit();
 
     res.status(200).json({
       message: 'Deals processed successfully',
