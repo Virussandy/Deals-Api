@@ -11,11 +11,8 @@ function cleanText(text) {
   return trimmed && trimmed.length > 0 ? trimmed : null;
 }
 
-function getISTTimestamp() {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + istOffset);
-  return ist.toISOString();
+function getUTCTimestamp() {
+  return new Date().toISOString();
 }
 
 async function asyncPool(tasks, limit) {
@@ -82,7 +79,7 @@ export default async function scrapeDesiDime(page = 1) {
         el.find('div.deal-box-image img').attr('data-src')?.replace('/medium/', '/original/')
       );
 
-      const posted = getISTTimestamp();
+      const posted = getUTCTimestamp();
       const redirectUrl = cleanText(el.find('div.getdeal a').attr('data-href'));
 
       // Skip if any essential field is missing

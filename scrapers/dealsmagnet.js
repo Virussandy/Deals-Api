@@ -7,11 +7,8 @@ function cleanText(text) {
   return trimmed && trimmed.length > 0 ? trimmed : null;
 }
 
-function getISTTimestamp() {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + istOffset);
-  return ist.toISOString();
+function getUTCTimestamp() {
+  return new Date().toISOString();
 }
 
 async function asyncPool(tasks, limit) {
@@ -87,7 +84,7 @@ export default async function scrapeDealsMagnet(page = 1) {
 
       const image = cleanText(card.find('.card-img img').attr('data-src')?.replace('-s-', '-o-'));
       const store = cleanText(card.find('.card-footer img').attr('alt'));
-      const postedAgo = getISTTimestamp();
+      const postedAgo = getUTCTimestamp();
 
       if (!title || !store || !redirectUrl) {
         return null;
