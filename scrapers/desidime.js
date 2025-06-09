@@ -63,7 +63,7 @@ export default async function scrapeDesiDime(page = 1) {
       const el = $(li);
 
       const title = cleanText(el.find('div.deal-dsp a').text());
-      const price = cleanText(el.find('div.deal-price').text());
+      const price = cleanText(el.find('div.deal-price').text().replace('₹',''));
 
       let discount = null;
       const percentSpan = cleanText(el.find('div.deal-percent span.percentoff').text());

@@ -73,8 +73,8 @@ export default async function scrapeDealsMagnet(page = 1) {
         redirectUrl = dealHref.startsWith('http') ? dealHref : `https://www.dealsmagnet.com${dealHref}`;
       }
 
-      const price = cleanText(card.find('.card-DealPrice').text().replace(/\s+/g, ' '));
-      const originalPrice = cleanText(card.find('.card-OriginalPrice').text().replace(/\s+/g, ' '));
+      const price = cleanText(card.find('.card-DealPrice').text().replace(/\s+/g, ' ').replace('₹',''));
+      const originalPrice = cleanText(card.find('.card-OriginalPrice').text().replace(/\s+/g, ' ').replace('₹',''));
 
       const discountBig = cleanText(card.find('.card-DiscountPrice .big').text());
       const discountSmall = cleanText(card.find('.card-DiscountPrice .small').text());
