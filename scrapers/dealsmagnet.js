@@ -82,7 +82,7 @@ export default async function scrapeDealsMagnet(page = 1) {
         ? [discountBig, discountSmall].filter(Boolean).join(' ')
         : null;
 
-      const image = cleanText(card.find('.card-img img').attr('data-src')?.replace('-s-', '-o-'));
+      const image = cleanText("https://deals.sandeepks-jsr.workers.dev/?url="+card.find('.card-img img').attr('data-src')?.replace('-s-', '-o-'));
       const store = cleanText(card.find('.card-footer img').attr('alt'));
       const postedAgo = getUTCTimestamp();
 
