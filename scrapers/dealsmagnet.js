@@ -53,7 +53,7 @@ export default async function scrapeDealsMagnet(page = 1) {
 
     const html = await tab.content();
     const $ = cheerio.load(html);
-    const dealElements = $('div.col-lg-3.col-md-4.col-sm-6.col-6.pl-1.pr-1.pb-2').toArray();
+    const dealElements = $('div.col-lg-3.col-md-4.col-sm-6.col-6.pl-1.pr-1.pb-2').toArray().reverse();
 
     const tasks = dealElements.map((el) => async () => {
       const card = $(el);

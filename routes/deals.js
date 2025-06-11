@@ -62,17 +62,19 @@ router.get('/', async (req, res) => {
     // 3. Resolve URLs in parallel
     const browser = await getBrowser();
 
-    await asyncPool(newDeals.map(deal => async () => {
+    await asyncPool(
+      newDeals.map(deal => async () => {
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
       deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
       delete deal.redirectUrl;
-    }), 5);
+    })
+    , 1);
 
     await browser.close();
 
     // 4. Save to /deals and index to /deal_index
     const batch = db.batch();
-    for (const deal of newDeals) {
+    for (const deal of newDeals.reverse()) {
       const dealRef = db.collection('deals').doc(deal.deal_id);
       batch.set(dealRef, deal);
     }

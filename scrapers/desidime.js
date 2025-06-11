@@ -57,7 +57,7 @@ export default async function scrapeDesiDime(page = 1) {
 
     const html = await tab.content();
     const $ = cheerio.load(html);
-    const dealElements = $('div#deals-grid ul.cf > li.tablet-grid-25.padfix.grid-20').toArray();
+    const dealElements = $('div#deals-grid ul.cf > li.tablet-grid-25.padfix.grid-20').toArray().reverse();
 
     const tasks = dealElements.map((li) => async () => {
       const el = $(li);
