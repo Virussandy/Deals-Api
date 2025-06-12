@@ -1,6 +1,4 @@
-FROM node:20-slim
-
-# Install Chromium dependencies
+# Puppeteer v24 requires Chrome 137+ and these dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -20,13 +18,18 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Puppeteer v24+ does not auto-install Chrome, so we must do it manually
+RUN npm i -g puppeteer@24.10.0 && \
+    npx puppeteer browsers install chrome
 
 WORKDIR /app
 COPY . .
 
-# Install all dependencies including puppeteer (which installs Chrome)
+# Install your project dependencies
 RUN npm install
 
 ENV PORT=8080
