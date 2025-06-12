@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# Puppeteer dependencies
+# Install dependencies required by Chrome
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -23,16 +23,15 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set workdir and copy project files
 WORKDIR /app
+
 COPY . .
 
-# Install Node dependencies
-RUN npm install
+# Install puppeteer-core and manually fetch Chrome
+RUN npm install && \
+    npx puppeteer browsers install chrome
 
-# Expose port for Cloud Run
 ENV PORT=8080
 EXPOSE 8080
 
-# Start server
 CMD ["node", "server.js"]
