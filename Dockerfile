@@ -1,6 +1,7 @@
+# Use official Node.js slim image
 FROM node:20-slim
 
-# Puppeteer v24 requires Chrome 137+ and these dependencies
+# Install required dependencies for Puppeteer & Chrome
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -20,21 +21,27 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    --no-install-recommends \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Puppeteer v24+ does not auto-install Chrome, so we must do it manually
+# Install Puppeteer and download compatible Chrome (v137+)
 RUN npm i -g puppeteer@24.10.0 && \
     npx puppeteer browsers install chrome
 
+# Create app directory and copy files
 WORKDIR /app
 COPY . .
 
-# Install your project dependencies
+# Install app dependencies
 RUN npm install
 
+# Set environment variables
+ENV PUPPETEER_EXECUTABLE_PATH=/app/node_modules/puppeteer/.local-chromium/linux-1371012/chrome-linux64/chrome
 ENV PORT=8080
+
+# Expose port for Cloud Run
 EXPOSE 8080
 
+# Start the app
 CMD ["node", "server.js"]
