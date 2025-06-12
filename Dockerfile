@@ -26,8 +26,7 @@ RUN apt-get update && apt-get install -y \
     rm -rf /var/lib/apt/lists/*
 
 # Install Puppeteer and download compatible Chrome (v137+)
-RUN npm i -g puppeteer@24.10.0 && \
-    npx puppeteer browsers install chrome
+RUN npm install puppeteer@24.10.0
 
 # Create app directory and copy files
 WORKDIR /app
