@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-# Install required dependencies for Chromium
+# Install Chromium dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -23,18 +23,12 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
-
-# Copy files and install dependencies
 COPY . .
 
+# Install all dependencies including puppeteer (which installs Chrome)
 RUN npm install
 
-# Install Chrome explicitly using puppeteer-core
-RUN node -e "require('puppeteer-core/lib/cjs/puppeteer/node/install.js').download('chrome')"
-
-# Set env and expose port
 ENV PORT=8080
 EXPOSE 8080
 
