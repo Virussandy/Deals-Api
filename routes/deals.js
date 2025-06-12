@@ -4,6 +4,7 @@ import dealsmagnet from '../scrapers/dealsmagnet.js';
 import db from '../firebase.js';
 import { getBrowser } from '../browser.js';
 import { resolveOriginalUrl, sanitizeUrl } from '../scrapers/utils.js';
+import dayjs from 'dayjs';
 
 const router = express.Router();
 
@@ -43,20 +44,37 @@ async function processDeals(page = 1) {
     }
   }
 
+  // Fetch existing deals
   const indexSnapshots = await Promise.all(
     dealIds.map(id => db.collection('deals').doc(id).get())
   );
 
-  const newDeals = indexSnapshots
-    .filter(snapshot => !snapshot.exists)
-    .map(snapshot => dealMap.get(snapshot.id));
+  const newDeals = [];
+  const dealsToUpdate = [];
+
+  for (const snapshot of indexSnapshots) {
+    const deal = dealMap.get(snapshot.id);
+    if (!snapshot.exists) {
+      newDeals.push(deal);
+    } else {
+      const existingDeal = snapshot.data();
+      const existingPostedOn = dayjs(existingDeal.posted_on);
+      const newPostedOn = dayjs(deal.posted_on);
+      const diffHours = Math.abs(newPostedOn.diff(existingPostedOn, 'hour'));
+
+      if (diffHours > 6) {
+        dealsToUpdate.push(deal);
+      }
+    }
+  }
 
   console.log(`🆕 ${newDeals.length} new deals to resolve and store`);
+  console.log(`🕒 ${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
 
   await asyncPool(
-    newDeals.map(deal => async () => {
+    [...newDeals, ...dealsToUpdate].map(deal => async () => {
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
       deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
       delete deal.redirectUrl;
@@ -67,7 +85,15 @@ async function processDeals(page = 1) {
   await browser.close();
 
   const batch = db.batch();
+
+  // Insert new deals
   for (const deal of newDeals.reverse()) {
+    const dealRef = db.collection('deals').doc(deal.deal_id);
+    batch.set(dealRef, deal);
+  }
+
+  // Update existing deals where 6hr rule applied
+  for (const deal of dealsToUpdate.reverse()) {
     const dealRef = db.collection('deals').doc(deal.deal_id);
     batch.set(dealRef, deal);
   }
@@ -78,7 +104,8 @@ async function processDeals(page = 1) {
     message: 'Deals processed successfully',
     scraped: allDeals.length,
     stored: newDeals.length,
-    skipped: allDeals.length - newDeals.length,
+    updated: dealsToUpdate.length,
+    skipped: allDeals.length - (newDeals.length + dealsToUpdate.length),
   };
 }
 
@@ -98,7 +125,7 @@ router.get('/', async (req, res) => {
 // ✅ POST handler for Pub/Sub
 router.post('/', async (req, res) => {
   try {
-    const result = await processDeals(1); // Always use page 1 for Pub/Sub
+    const result = await processDeals(1);
     res.status(200).json(result);
   } catch (error) {
     console.error('🔥 Error in POST:', error);
