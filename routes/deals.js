@@ -103,21 +103,21 @@ await asyncPool(
 
   await browser.close();
 
-  // const batch = db.batch();
+  const batch = db.batch();
 
-  // // Insert new deals
-  // for (const deal of newDeals.reverse()) {
-  //   const dealRef = db.collection('deals').doc(deal.deal_id);
-  //   batch.set(dealRef, deal);
-  // }
+  // Insert new deals
+  for (const deal of newDeals.reverse()) {
+    const dealRef = db.collection('deals').doc(deal.deal_id);
+    batch.set(dealRef, deal);
+  }
 
-  // // Update existing deals where 6hr rule applied
-  // for (const deal of dealsToUpdate.reverse()) {
-  //   const dealRef = db.collection('deals').doc(deal.deal_id);
-  //   batch.set(dealRef, deal);
-  // }
+  // Update existing deals where 6hr rule applied
+  for (const deal of dealsToUpdate.reverse()) {
+    const dealRef = db.collection('deals').doc(deal.deal_id);
+    batch.set(dealRef, deal);
+  }
 
-  // await batch.commit();
+  await batch.commit();
 
   return {
     message: 'Deals processed successfully',
