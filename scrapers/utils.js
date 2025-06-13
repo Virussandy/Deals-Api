@@ -44,7 +44,7 @@ export async function convertAffiliateLink(redirectUrl) {
       method: 'post',
       url: 'https://ekaro-api.affiliaters.in/api/converter/public',
       headers: { 
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU',  // <-- Replace your token here
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU`,  // <-- Replace your token here
         'Content-Type': 'application/json'
       },
       data: data
@@ -136,7 +136,7 @@ export function sanitizeUrl(inputUrl) {
   }
 }
 
-export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 10000) {
+export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 5000) {
   function delay(ms) {
     return new Promise(res => setTimeout(res, ms));
   }
@@ -145,16 +145,29 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
     let tab;
     try {
       tab = await browser.newPage();
-      await tab.goto(redirectUrl, { waitUntil: 'domcontentloaded', timeout: 0 });
+
+      // Add better User-Agent to prevent bot blocking
+      await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110 Safari/537.36');
+
+      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+
       const finalUrl = tab.url();
       await tab.close();
-      return finalUrl;
+
+      // ✅ Extra protection: If finalUrl is valid HTTP(S)
+      if (finalUrl?.startsWith('http')) {
+        return finalUrl;
+      }
     } catch (err) {
+      console.error(`Attempt ${attempt} failed to resolve URL:`, err.message);
       if (tab) await tab.close();
       if (attempt < retries) {
         await delay(delayMs);
       }
     }
   }
-  return redirectUrl;
+
+  // If all retries failed, better to return null to indicate failure
+  return null;
 }
+

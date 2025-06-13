@@ -15,8 +15,8 @@ async function convertAffiliateLink(redirectUrl) {
     method: 'post',
     url: 'https://ekaro-api.affiliaters.in/api/converter/public',
     headers: {
-      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU',
-      'Content-Type': 'application/json'
+      'Authorization':`Bearer ${apiToken}`,
+      'Content-Type':'application/json'
     },
     data: payload,
     timeout: 10000
