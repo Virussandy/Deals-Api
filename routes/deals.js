@@ -3,7 +3,7 @@ import desidime from '../scrapers/desidime.js';
 import dealsmagnet from '../scrapers/dealsmagnet.js';
 import db from '../firebase.js';
 import { getBrowser } from '../browser.js';
-import { resolveOriginalUrl, sanitizeUrl } from '../scrapers/utils.js';
+import { resolveOriginalUrl, sanitizeUrl , convertAffiliateLink} from '../scrapers/utils.js';
 import dayjs from 'dayjs';
 
 const router = express.Router();
@@ -73,32 +73,51 @@ async function processDeals(page = 1) {
 
   const browser = await getBrowser();
 
-  await asyncPool(
-    [...newDeals, ...dealsToUpdate].map(deal => async () => {
+await asyncPool(
+  [...newDeals, ...dealsToUpdate].map(deal => async () => {
+    try {
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
-      deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
+
+      // Now call affiliate API with resolved URL
+      const affiliateResponse = await convertAffiliateLink(resolvedUrl);
+
+      if (affiliateResponse.success) {
+        // ✅ If affiliate API gave valid http URL, resolve again
+        const finalResolvedUrl = await resolveOriginalUrl(browser, affiliateResponse.newUrl, 1);
+        console.log(finalResolvedUrl)
+        deal.url = finalResolvedUrl;  // directly assign without sanitize
+      } else {
+        // ❌ API failed, fallback to your old sanitize method
+        deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
+        console.log(deal.url)
+      }
+
       delete deal.redirectUrl;
-    }),
-    1
-  );
+    } catch (err) {
+      console.error('🔥 Error processing deal:', err);
+    }
+  }),
+  1
+);
+
 
   await browser.close();
 
-  const batch = db.batch();
+  // const batch = db.batch();
 
-  // Insert new deals
-  for (const deal of newDeals.reverse()) {
-    const dealRef = db.collection('deals').doc(deal.deal_id);
-    batch.set(dealRef, deal);
-  }
+  // // Insert new deals
+  // for (const deal of newDeals.reverse()) {
+  //   const dealRef = db.collection('deals').doc(deal.deal_id);
+  //   batch.set(dealRef, deal);
+  // }
 
-  // Update existing deals where 6hr rule applied
-  for (const deal of dealsToUpdate.reverse()) {
-    const dealRef = db.collection('deals').doc(deal.deal_id);
-    batch.set(dealRef, deal);
-  }
+  // // Update existing deals where 6hr rule applied
+  // for (const deal of dealsToUpdate.reverse()) {
+  //   const dealRef = db.collection('deals').doc(deal.deal_id);
+  //   batch.set(dealRef, deal);
+  // }
 
-  await batch.commit();
+  // await batch.commit();
 
   return {
     message: 'Deals processed successfully',

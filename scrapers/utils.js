@@ -1,5 +1,8 @@
 import { URL } from 'url';
 import crypto from 'crypto';
+import axios from 'axios';
+
+const api_token = process.env.EARN_KARO_API_KEY;
 
 export function normalizeText(text) {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -27,6 +30,71 @@ export function generateDealId(title, store, url) {
   hash.update(normalizedTitle + normalizedStore + normalizedUrl);
   return hash.digest('hex');
 }
+
+
+export async function convertAffiliateLink(redirectUrl) {
+
+  try {
+    const data = JSON.stringify({
+      deal: redirectUrl,
+      convert_option: "convert_only"
+    });
+
+    const config = {
+      method: 'post',
+      url: 'https://ekaro-api.affiliaters.in/api/converter/public',
+      headers: { 
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU',  // <-- Replace your token here
+        'Content-Type': 'application/json'
+      },
+      data: data
+    };
+
+    const response = await axios(config);
+
+    if (response.data?.success === 1 && response.data?.data?.startsWith("http")) {
+      return {
+        success: true,
+        newUrl: response.data.data
+      };
+    } else {
+      return { success: false, reason: "Invalid response format" };
+    }
+  } catch (error) {
+    console.error("Affiliate API error:", error?.response?.data || error?.message);
+    return { success: false, reason: "API call failed" };
+  }
+
+
+  // const payload = {
+  //   deal: redirectUrl,
+  //   convert_option: "convert_only"
+  // };
+
+  // try {
+  //   const response = await axios.post(
+  //     'https://ekaro-api.affiliaters.in/api/converter/public',
+  //     payload,
+  //     {
+  //       headers: {
+  //         'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU',
+  //         'Content-Type': 'application/json'
+  //       },
+  //       timeout: 10000
+  //     }
+  //   );
+
+  //   if (response?.data?.success === 1) {
+  //     return { success: true, convertedUrl: response.data.data };
+  //   } else {
+  //     return { success: false, error: response.data?.message || 'Unknown error' };
+  //   }
+  // } catch (error) {
+  //   console.error('Affiliate API error:', error.response?.data || error.message);
+  //   return { success: false, error: error.message };
+  // }
+}
+
 
 
 export function sanitizeUrl(inputUrl) {
@@ -68,7 +136,7 @@ export function sanitizeUrl(inputUrl) {
   }
 }
 
-export async function resolveOriginalUrl(browser, redirectUrl, retries = 1, delayMs = 3000) {
+export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 10000) {
   function delay(ms) {
     return new Promise(res => setTimeout(res, ms));
   }
@@ -88,5 +156,5 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries = 1, dela
       }
     }
   }
-  return 'N/A';
+  return redirectUrl;
 }
