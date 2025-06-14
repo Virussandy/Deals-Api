@@ -88,7 +88,7 @@ await asyncPool(
         deal.url = finalResolvedUrl;  // directly assign without sanitize
       } else {
         // ❌ API failed, fallback to your old sanitize method
-        deal.url = sanitizeUrl(resolvedUrl)?.replace('dealsmagnet.com/', '');
+        deal.url = sanitizeUrl(resolvedUrl);
         console.log(deal.url)
       }
 
