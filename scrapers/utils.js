@@ -120,28 +120,41 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
     try {
       tab = await browser.newPage();
 
-      // Add better User-Agent to prevent bot blocking
       await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110 Safari/537.36');
+      await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
-      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+      let finalUrl = null;
 
-      const finalUrl = tab.url();
+      // Listen only to main-frame navigations
+      tab.on('framenavigated', (frame) => {
+        if (frame === tab.mainFrame()) {
+          const url = frame.url();
+          //console.log(`Main frame navigated to: ${url}`);
+          finalUrl = url;
+        }
+      });
+
+      await tab.goto(redirectUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+
+      // Give time for any JS-based redirects to happen
+      await delay(3000);
+
+      if (!finalUrl) {
+        finalUrl = tab.url();
+      }
+
       await tab.close();
 
-      // ✅ Extra protection: If finalUrl is valid HTTP(S)
       if (finalUrl?.startsWith('http')) {
         return finalUrl;
       }
     } catch (err) {
-      console.error(`Attempt ${attempt} failed to resolve URL:`, err.message);
+      console.error(`Attempt ${attempt} failed:`, err.message);
       if (tab) await tab.close();
-      if (attempt < retries) {
-        await delay(delayMs);
-      }
+      if (attempt < retries) await delay(delayMs);
     }
   }
 
-  // If all retries failed, better to return null to indicate failure
   return redirectUrl;
 }
 
