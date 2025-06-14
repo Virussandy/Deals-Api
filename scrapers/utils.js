@@ -168,6 +168,6 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
   }
 
   // If all retries failed, better to return null to indicate failure
-  return null;
+  return redirectUrl;
 }
 
