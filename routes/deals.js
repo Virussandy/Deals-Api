@@ -62,7 +62,7 @@ async function processDeals(page = 1) {
       const newPostedOn = dayjs(deal.posted_on);
       const diffHours = Math.abs(newPostedOn.diff(existingPostedOn, 'hour'));
 
-      if (diffHours > 6) {
+      if (diffHours > 24) {
         dealsToUpdate.push(deal);
       }
     }
