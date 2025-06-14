@@ -2,6 +2,9 @@ import { URL } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 const api_token = process.env.EARN_KARO_API_KEY;
 
 export function normalizeText(text) {
@@ -44,7 +47,7 @@ export async function convertAffiliateLink(redirectUrl) {
       method: 'post',
       url: 'https://ekaro-api.affiliaters.in/api/converter/public',
       headers: { 
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU`,  // <-- Replace your token here
+        'Authorization': `Bearer ${api_token}`,  // <-- Replace your token here
         'Content-Type': 'application/json'
       },
       data: data
@@ -64,35 +67,6 @@ export async function convertAffiliateLink(redirectUrl) {
     console.error("Affiliate API error:", error?.response?.data || error?.message);
     return { success: false, reason: "API call failed" };
   }
-
-
-  // const payload = {
-  //   deal: redirectUrl,
-  //   convert_option: "convert_only"
-  // };
-
-  // try {
-  //   const response = await axios.post(
-  //     'https://ekaro-api.affiliaters.in/api/converter/public',
-  //     payload,
-  //     {
-  //       headers: {
-  //         'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODRiYWVjYzdmODE5ODM3MGMwMmFjZWUiLCJlYXJua2FybyI6IjQ0Mzg4NzYiLCJpYXQiOjE3NDk3OTA4MDR9.yLdZLl_TnD5TodH7tzvcVtr7TuqtYPSWZiRFiDCL6JU',
-  //         'Content-Type': 'application/json'
-  //       },
-  //       timeout: 10000
-  //     }
-  //   );
-
-  //   if (response?.data?.success === 1) {
-  //     return { success: true, convertedUrl: response.data.data };
-  //   } else {
-  //     return { success: false, error: response.data?.message || 'Unknown error' };
-  //   }
-  // } catch (error) {
-  //   console.error('Affiliate API error:', error.response?.data || error.message);
-  //   return { success: false, error: error.message };
-  // }
 }
 
 
