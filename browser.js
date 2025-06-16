@@ -15,10 +15,10 @@ export const getBrowser = async () => {
     ],
   });
 
-  // const pages = await browser.pages();
-  // if (pages.length > 0) {
-  //   await pages[0].close();
-  // }
+  const pages = await browser.pages();
+  if (pages.length > 0) {
+    await pages[0].close();
+  }
 
   return browser;
 };
