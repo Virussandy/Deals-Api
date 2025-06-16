@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
 import { getBrowser } from '../browser.js';
-import { generateDealId } from './utils.js';
+import { generateDealId } from '../utils/utils.js';
 
 puppeteer.use(StealthPlugin());
 

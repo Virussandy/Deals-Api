@@ -3,29 +3,10 @@ import desidime from '../scrapers/desidime.js';
 import dealsmagnet from '../scrapers/dealsmagnet.js';
 import db from '../firebase.js';
 import { getBrowser } from '../browser.js';
-import { resolveOriginalUrl, sanitizeUrl , convertAffiliateLink} from '../scrapers/utils.js';
+import { resolveOriginalUrl, sanitizeUrl , convertAffiliateLink} from '../utils/utils.js';
 import dayjs from 'dayjs';
 
 const router = express.Router();
-
-async function asyncPool(tasks, limit) {
-  const results = [];
-  const executing = new Set();
-
-  for (const task of tasks) {
-    const p = Promise.resolve().then(() => task());
-    results.push(p);
-    executing.add(p);
-
-    const clean = () => executing.delete(p);
-    p.then(clean).catch(clean);
-
-    if (executing.size >= limit) {
-      await Promise.race(executing);
-    }
-  }
-  return Promise.all(results);
-}
 
 async function processDeals(page = 1) {
   const [desidimeDeals, dealsmagnetDeals] = await Promise.all([
@@ -73,33 +54,28 @@ async function processDeals(page = 1) {
 
   const browser = await getBrowser();
 
-await asyncPool(
-  [...newDeals, ...dealsToUpdate].map(deal => async () => {
-    try {
-      const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
-
-      // Now call affiliate API with resolved URL
-      const affiliateResponse = await convertAffiliateLink(resolvedUrl);
-
+for (const deal of [...newDeals, ...dealsToUpdate]) {
+  try {
+    console.log(deal.redirectUrl)
+    deal.redirectUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
+    console.log(deal.redirectUrl)
+    try{
+       const affiliateResponse = await convertAffiliateLink(deal.redirectUrl);
       if (affiliateResponse.success) {
-        // ✅ If affiliate API gave valid http URL, resolve again
-        const finalResolvedUrl = await resolveOriginalUrl(browser, affiliateResponse.newUrl, 1);
-        console.log(finalResolvedUrl)
-        deal.url = finalResolvedUrl;  // directly assign without sanitize
+        deal.url = await resolveOriginalUrl(browser,affiliateResponse.newUrl, 1);
       } else {
-        // ❌ API failed, fallback to your old sanitize method
-        deal.url = sanitizeUrl(resolvedUrl);
-        console.log(deal.url)
+        deal.url = sanitizeUrl(deal.redirectUrl);
       }
-
       delete deal.redirectUrl;
-    } catch (err) {
-      console.error('🔥 Error processing deal:', err);
+    }catch(err){
+      console.error('Error convert Affiliate link');
     }
-  }),
-  1
-);
-
+  } catch (err) {
+    console.error('Error processing deal:', err);
+  }
+  console.log(deal.url)
+  console.log('\n');
+}
 
   await browser.close();
 

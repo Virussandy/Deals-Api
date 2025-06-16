@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { getBrowser } from '../browser.js';
-import { generateDealId } from './utils.js';
+import { generateDealId } from '../utils/utils.js';
 
 function cleanText(text) {
   const trimmed = text?.trim();
