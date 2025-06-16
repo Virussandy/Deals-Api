@@ -119,8 +119,9 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
     let tab;
     try {
       tab = await browser.newPage();
-      await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110 Safari/537.36');
+      await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36');
       await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+
 
       await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 

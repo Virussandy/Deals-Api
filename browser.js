@@ -9,16 +9,18 @@ export const getBrowser = async () => {
     headless: 'new',
     args: [
         '--disable-gpu',
-        '--disable-dev-shm-usage',
         '--no-sandbox',
         '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-features=site-per-process',
         '--disable-breakpad',
         '--no-zygote',
-        '--disable-dev-shm-usage',
         '--disable-web-security',
-    ],
+        '--start-maximized',
+        '--window-size=1366,768',
+        '--user-data-dir=/tmp/chrome-user-data',
+      ],
   });
 
   const pages = await browser.pages();
