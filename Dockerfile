@@ -1,7 +1,7 @@
 # Use official Node.js image (based on Debian)
 FROM node:20
 
-# Install required system dependencies for Puppeteer
+# Install system dependencies for Puppeteer + Xvfb
 RUN apt-get update && apt-get install -y \
     wget \
     ca-certificates \
@@ -21,11 +21,12 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    xvfb \
     --no-install-recommends && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Puppeteer globally (v24.10.0)
+# Install Puppeteer globally
 RUN npm install -g puppeteer@24.10.0 && \
     npx puppeteer browsers install chrome
 
@@ -44,5 +45,5 @@ ENV PORT=8080
 # Expose port
 EXPOSE 8080
 
-# Start the app
-CMD ["node", "server.js"]
+# Start the app using Xvfb to enable headful browser
+CMD xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node server.js
