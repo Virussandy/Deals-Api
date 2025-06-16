@@ -110,7 +110,7 @@ export function sanitizeUrl(inputUrl) {
   }
 }
 
-export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 0) {
+export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 30000) {
   function delay(ms) {
     return new Promise(res => setTimeout(res, ms));
   }
@@ -122,7 +122,7 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
       await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110 Safari/537.36');
       await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
-      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 20000 });
+      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
       await delay(1000); // give small buffer for JS redirects
 

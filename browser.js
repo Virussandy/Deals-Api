@@ -6,7 +6,7 @@ puppeteer.use(StealthPlugin());
 
 export const getBrowser = async () => {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: 'new',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',

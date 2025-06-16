@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y \
 RUN npm install -g puppeteer@24.10.0 && \
     npx puppeteer browsers install chrome
 
+# RUN npm install -g playwright@1.53.0 && \
+#     npx playwright install chromium
+
 # Set working directory
 WORKDIR /app
 
@@ -46,4 +49,7 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Start the app using Xvfb to enable headful browser
-CMD xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node server.js
+# RUN apt-get update && apt-get install -y xvfb
+
+# CMD xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" node server.js
+CMD ["node", "server.js"]
