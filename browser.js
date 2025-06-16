@@ -8,10 +8,16 @@ export const getBrowser = async () => {
   const browser = await puppeteer.launch({
     headless: 'new',
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-accelerated-2d-canvas',
+        '--disable-features=site-per-process',
+        '--disable-breakpad',
+        '--no-zygote',
+        '--disable-dev-shm-usage',
+        '--disable-web-security',
     ],
   });
 
