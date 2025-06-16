@@ -119,41 +119,28 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
     let tab;
     try {
       tab = await browser.newPage();
-
       await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110 Safari/537.36');
       await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
-      let finalUrl = null;
+      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 20000 });
 
-      // Listen only to main-frame navigations
-      tab.on('framenavigated', (frame) => {
-        if (frame === tab.mainFrame()) {
-          const url = frame.url();
-          //console.log(`Main frame navigated to: ${url}`);
-          finalUrl = url;
-        }
-      });
+      await delay(1000); // give small buffer for JS redirects
 
-      await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 0 });
-
-      // Give time for any JS-based redirects to happen
-      await delay(0);
-
-      if (!finalUrl) {
-        finalUrl = tab.url();
-      }
+      const finalUrl = tab.url();
 
       await tab.close();
 
       if (finalUrl?.startsWith('http')) {
-        return finalUrl.replace('/dealsmagnet.com','');
+        return finalUrl.replace('/dealsmagnet.com', '');
       }
     } catch (err) {
       console.error(`Attempt ${attempt} failed:`, err.message);
-      if (tab) await tab.close();
+      if (tab) {
+        try { await tab.close(); } catch (e) {}
+      }
       if (attempt < retries) await delay(delayMs);
     }
   }
 
-  return redirectUrl.replace('/dealsmagnet.com','');
+  return redirectUrl.replace('/dealsmagnet.com', '');
 }
