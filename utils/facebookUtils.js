@@ -1,11 +1,8 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import dayjs from 'dayjs';
-<<<<<<< HEAD
-import { db, storage } from '../firebase.js';
-=======
+
 import { db, storage, FieldValue  } from '../firebase.js';
->>>>>>> 68a29315fe9e902667911e329ea3428881fd017d
 
 dotenv.config();
 const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
@@ -38,11 +35,7 @@ export async function updatePostMeta() {
   const metaRef = db.collection('meta').doc('fb_post_status');
   await metaRef.update({
     lastPostAt: new Date().toISOString(),
-<<<<<<< HEAD
-    count: admin.firestore.FieldValue.increment(1),
-=======
     count: FieldValue.increment(1),
->>>>>>> 68a29315fe9e902667911e329ea3428881fd017d
   });
 }
 

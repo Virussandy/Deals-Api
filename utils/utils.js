@@ -78,38 +78,8 @@ export function generateDealId(title,store) {
   }
 }
 
-
-<<<<<<< HEAD
- export function insertOrReplaceMeeshoInvite(url, inviteCode = '384288512', source = 'android_app', campaignId = 'default') {
-  try {
-    const parsedUrl = new URL(url);
-
-    // Required affiliate params
-    const params = parsedUrl.searchParams;
-    params.set('af_force_deeplink', 'true');
-    params.set('host_internal', 'single_product');
-    params.set('pid', 'meesho_affiliate_portal');
-    params.set('is_retargeting', 'true');
-    params.set('af_click_lookback', '7d');
-    params.set('af_reengagement_window', '14d');
-    params.set('product_name', 'product');
-    params.set('utm_source', source);  // YouTube, Insta, etc.
-    params.set('c', `${inviteCode}:${source}:${campaignId}`); // tracking code
-
-    parsedUrl.search = params.toString();
-    return parsedUrl.toString();
-  } catch (e) {
-    return url; // fallback for invalid URLs
-  }
-}
-
-
 export async function convertAffiliateLink(redirectUrl) {
   try {
-=======
-export async function convertAffiliateLink(redirectUrl) {
-  try {
->>>>>>> 68a29315fe9e902667911e329ea3428881fd017d
     if (!api_token) {
       console.error("❌ API token is missing!");
       return { success: false, reason: "No token" };
