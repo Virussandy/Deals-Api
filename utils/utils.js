@@ -8,7 +8,11 @@ dotenv.config();
 const api_token = process.env.EARN_KARO_API_KEY;
 
 export function normalizeText(text) {
-  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+  return text.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')  // remove all special characters
+    .replace(/\s+/g, ' ')         // collapse multiple spaces to one
+    .trim();
 }
 
 export function normalizeUrl(url) {
@@ -22,22 +26,66 @@ export function normalizeUrl(url) {
   }
 }
 
-export function generateDealId(title, store, url) {
+export function generateDealId(title,store) {
   const normalizedTitle = normalizeText(title);
   const normalizedStore = normalizeText(store);
-  const normalizedUrl = normalizeUrl(url);
+  // const normalizedUrl = normalizeUrl(url);
 
-  if (!normalizedTitle || !normalizedStore || !normalizedUrl) return null;
+  if (!normalizedTitle || !normalizedStore) return null;
+  // if (!normalizedUrl ) return null;
+
+  // Take first 5 words or fewer
+  // const firstWords = normalizedTitle.split(/\s+/).slice(0, 5).join(' ');
 
   const hash = crypto.createHash('sha256');
-  hash.update(normalizedTitle + normalizedStore + normalizedUrl);
+  hash.update(normalizedTitle + normalizedStore);
+  // hash.update(url);
   return hash.digest('hex');
+}
+
+// export function generateDealId(url) {
+//   if (!url || typeof url !== 'string') return null;
+
+//   // Normalize (optional but recommended)
+//   const normalizedUrl = url.trim().toLowerCase();
+
+//   const hash = crypto.createHash('sha256');
+//   hash.update(normalizedUrl);
+//   return hash.digest('hex');
+// }
+
+
+ export function insertOrReplaceMeeshoInvite(url, inviteCode = '384288512', source = 'android_app', campaignId = 'default') {
+  try {
+    const parsedUrl = new URL(url);
+
+    // Required affiliate params
+    const params = parsedUrl.searchParams;
+    params.set('af_force_deeplink', 'true');
+    params.set('host_internal', 'single_product');
+    params.set('pid', 'meesho_affiliate_portal');
+    params.set('is_retargeting', 'true');
+    params.set('af_click_lookback', '7d');
+    params.set('af_reengagement_window', '14d');
+    params.set('product_name', 'product');
+    params.set('utm_source', source);  // YouTube, Insta, etc.
+    params.set('c', `${inviteCode}:${source}:${campaignId}`); // tracking code
+
+    parsedUrl.search = params.toString();
+    return parsedUrl.toString();
+  } catch (e) {
+    return url; // fallback for invalid URLs
+  }
 }
 
 
 export async function convertAffiliateLink(redirectUrl) {
-
   try {
+    if (!api_token) {
+      console.error("❌ API token is missing!");
+      return { success: false, reason: "No token" };
+    }
+
     const data = JSON.stringify({
       deal: redirectUrl,
       convert_option: "convert_only"
@@ -46,8 +94,9 @@ export async function convertAffiliateLink(redirectUrl) {
     const config = {
       method: 'post',
       url: 'https://ekaro-api.affiliaters.in/api/converter/public',
-      headers: { 
-        'Authorization': `Bearer ${api_token}`, 
+      timeout: 15000, // ⏱️ Max wait time: 10 seconds
+      headers: {
+        'Authorization': `Bearer ${api_token}`,
         'Content-Type': 'application/json'
       },
       data: data
@@ -68,6 +117,7 @@ export async function convertAffiliateLink(redirectUrl) {
     return { success: false, reason: "API call failed" };
   }
 }
+
 
 
 
@@ -122,13 +172,10 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
       await tab.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36');
       await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
-
       await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      await delay(1000); // give small buffer for JS redirects
+      await delay(1000); // buffer for JS redirects
 
       const finalUrl = tab.url();
-
       await tab.close();
 
       if (finalUrl?.startsWith('http')) {
@@ -143,5 +190,5 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
     }
   }
 
-  return redirectUrl.replace('/dealsmagnet.com', '');
+  return null; // 🚫 Failure explicitly returned
 }

@@ -55,56 +55,78 @@ export default async function scrapeDealsMagnet(page = 1) {
     const $ = cheerio.load(html);
     const dealElements = $('div.col-lg-3.col-md-4.col-sm-6.col-6.pl-1.pr-1.pb-2').toArray().reverse();
 
-    const tasks = dealElements.map((el) => async () => {
-      const card = $(el);
+    const tasks = dealElements.map(el => async () => {
+      try {
+        const card = $(el);
 
-      const title = cleanText(card.find('p.card-text a.MainCardAnchore').text());
+        const title = (cleanText(card.find('p.card-text a.MainCardAnchore').text()) || '').trim();
 
-      // Determine redirect URL
-      let redirectUrl = null;
-      const buyButton = card.find('button.buy-button');
-      if (buyButton.length > 0) {
-        const dataCode = buyButton.attr('data-code');
-        if (dataCode) {
-          redirectUrl = `https://www.dealsmagnet.com/buy?${dataCode}`;
+        // Redirect URL logic
+        let redirectUrl = null;
+        const buyButton = card.find('button.buy-button');
+        if (buyButton.length > 0) {
+          const dataCode = buyButton.attr('data-code');
+          if (dataCode) {
+            redirectUrl = `https://www.dealsmagnet.com/buy?${dataCode}`;
+          }
         }
-      } else {
-        const dealHref = card.find('p.card-text a.MainCardAnchore').attr('href') || '';
-        redirectUrl = dealHref.startsWith('http') ? dealHref : `https://www.dealsmagnet.com${dealHref}`;
-      }
 
-      const price = cleanText(card.find('.card-DealPrice').text().replace(/\s+/g, ' ').replace('₹',''));
-      const originalPrice = cleanText(card.find('.card-OriginalPrice').text().replace(/\s+/g, ' ').replace('₹',''));
+        if (!redirectUrl) {
+          const dealHref = card.find('p.card-text a.MainCardAnchore').attr('href') || '';
+          redirectUrl = dealHref
+            ? (dealHref.startsWith('http') ? dealHref : `https://www.dealsmagnet.com${dealHref}`)
+            : null;
+        }
 
-      const discountBig = cleanText(card.find('.card-DiscountPrice .big').text());
-      const discountSmall = cleanText(card.find('.card-DiscountPrice .small').text());
-      const discount = (discountBig || discountSmall)
-        ? [discountBig, discountSmall].filter(Boolean).join(' ')
-        : null;
+        const price = (cleanText(card.find('.card-DealPrice').text()) || '')
+          .replace(/\s+/g, ' ')
+          .replace('₹', '')
+          .trim();
 
-      const image = cleanText("https://deals.sandeepks-jsr.workers.dev/?url="+card.find('.card-img img').attr('data-src')?.replace('-s-', '-o-'));
-      const store = cleanText(card.find('.card-footer img').attr('alt'));
-      const postedAgo = getUTCTimestamp();
+        const originalPrice = (cleanText(card.find('.card-OriginalPrice').text()) || '')
+          .replace(/\s+/g, ' ')
+          .replace('₹', '')
+          .trim();
 
-      if (!title || !store || !redirectUrl) {
+        const discountBig = (cleanText(card.find('.card-DiscountPrice .big').text()) || '').trim();
+        const discountSmall = (cleanText(card.find('.card-DiscountPrice .small').text()) || '').trim();
+        const discount = [discountBig, discountSmall].filter(Boolean).join(' ') || null;
+
+        const imgSrc = card.find('.card-img img').attr('data-src') || '';
+        const image = imgSrc
+          ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('-s-', '-o-')}`
+          : null;
+        const storeAlt = card.find('.card-footer img').attr('alt') || '';
+        const storeRaw = (cleanText(storeAlt) || '').trim();
+        const store = storeRaw ? storeRaw.charAt(0).toUpperCase() + storeRaw.slice(1) : '';
+
+        const postedAgo = getUTCTimestamp();
+
+        if (!title || !store || !redirectUrl) {
+          console.warn(`⚠ Skipping incomplete deal: title=${title}, store=${store}, redirectUrl=${redirectUrl}`);
+          return null;
+        }
+
+        // const deal_id = generateDealId(title, store, redirectUrl);
+        const deal_id = generateDealId(title,store);
+        if (!deal_id) return null;
+
+        return {
+          deal_id,
+          title,
+          price: price || null,
+          originalPrice: originalPrice || null,
+          discount,
+          store,
+          image,
+          redirectUrl,
+          posted_on: postedAgo,
+          url: null,
+        };
+      } catch (innerErr) {
+        console.error('⚠ Error processing individual deal card:', innerErr);
         return null;
       }
-
-      const deal_id = generateDealId(title, store, redirectUrl);
-      if (!deal_id) return null;
-
-      return {
-        deal_id,
-        title,
-        price,
-        originalPrice,
-        discount,
-        store,
-        image,
-        redirectUrl,
-        posted_on: postedAgo,
-        url: null,
-      };
     });
 
     const deals = await asyncPool(tasks, 1);
@@ -118,3 +140,4 @@ export default async function scrapeDealsMagnet(page = 1) {
     await browser.close();
   }
 }
+
