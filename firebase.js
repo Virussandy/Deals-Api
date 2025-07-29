@@ -6,7 +6,10 @@ const serviceAccount = require('./firebaseKey.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
+  storageBucket: 'gs://ozonic-offnbuy.firebasestorage.app', // 🔁 Replace this
+  databaseURL: "https://ozonic-offnbuy-default-rtdb.firebaseio.com/"
 });
 
-const db = admin.firestore();
-export default db;
+export const db = admin.firestore();
+export const storage = admin.storage().bucket();
+export default admin;

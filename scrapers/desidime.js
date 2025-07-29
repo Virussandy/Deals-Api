@@ -60,60 +60,70 @@ export default async function scrapeDesiDime(page = 1) {
     const dealElements = $('div#deals-grid ul.cf > li.tablet-grid-25.padfix.grid-20').toArray().reverse();
 
     const tasks = dealElements.map((li) => async () => {
-      const el = $(li);
+      try {
+        const el = $(li);
 
-      const title = cleanText(el.find('div.deal-dsp a').text());
-      const price = cleanText(el.find('div.deal-price').text().replace('₹',''));
+        const title = (cleanText(el.find('div.deal-dsp a').text()) || '').trim();
+        const price = (cleanText(el.find('div.deal-price').text()) || '')
+          .replace('₹', '')
+          .trim();
 
-      let discount = null;
-      const percentSpan = cleanText(el.find('div.deal-percent span.percentoff').text());
-      const offSpan = cleanText(el.find('div.deal-percent span.dealoff').text());
-      if (percentSpan && offSpan) {
-        discount = `${percentSpan} ${offSpan}`;
-      } else {
-        discount = cleanText(el.find('div.deal-discount').text());
-      }
+        let discount = null;
+        const percentSpan = (cleanText(el.find('div.deal-percent span.percentoff').text()) || '').trim();
+        const offSpan = (cleanText(el.find('div.deal-percent span.dealoff').text()) || '').trim();
+        if (percentSpan && offSpan) {
+          discount = `${percentSpan} ${offSpan}`;
+        } else {
+          discount = (cleanText(el.find('div.deal-discount').text()) || '').trim() || null;
+        }
 
-      const store = cleanText(el.find('div.deal-store.ftl').text());
-      const image = cleanText(
-        el.find('div.deal-box-image img').attr('data-src')?.replace('/medium/', '/original/')
-      );
+        const store = (cleanText(el.find('div.deal-store.ftl').text()) || '').trim();
 
-      const posted = getUTCTimestamp();
-      const redirectUrl = cleanText(el.find('div.getdeal a').attr('data-href'));
+        const imgSrc = el.find('div.deal-box-image img').attr('data-src') || '';
+        const image = imgSrc
+          ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('/medium/', '/original/')}`
+          : null;
+        const redirectHref = el.find('div.getdeal a').attr('data-href') || '';
+        const redirectUrl = (cleanText(redirectHref) || '').trim();
 
-      // Skip if any essential field is missing
-      if (!title || !store || !redirectUrl) {
+        const posted = getUTCTimestamp();
+
+        // Skip if essential fields are missing
+        if (!title || !store || !redirectUrl) {
+          console.warn(`⚠ Skipping incomplete deal: title=${title}, store=${store}, redirectUrl=${redirectUrl}`);
+          return null;
+        }
+
+        // const deal_id = generateDealId(title, store, redirectUrl);
+        const deal_id = generateDealId(title,store);
+        if (!deal_id) return null;
+
+        return {
+          deal_id,
+          title,
+          price: price || null,
+          originalPrice: null,
+          discount,
+          store,
+          image,
+          redirectUrl,
+          posted_on: posted,
+          url: null,
+        };
+      } catch (innerErr) {
+        console.error('⚠ Error processing individual DesiDime deal:', innerErr);
         return null;
       }
-
-      const deal_id = generateDealId(title, store, redirectUrl);
-      if (!deal_id) return null;
-
-      return {
-        deal_id,
-        title,
-        price,
-        originalPrice: null,
-        discount,
-        store,
-        image,
-        redirectUrl,
-        posted_on: posted,
-        url: null,
-      };
     });
 
     const deals = await asyncPool(tasks, 1);
     await tab.close();
 
-    // Filter out nulls (invalid or incomplete deals)
     return deals.filter(Boolean);
-
   } catch (err) {
     console.error('❌ Error parsing DesiDime deals:', err);
     return null;
   } finally {
-    await browser.close(); // always close browser after use
+    await browser.close();
   }
 }
