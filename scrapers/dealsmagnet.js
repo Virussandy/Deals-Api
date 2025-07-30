@@ -94,7 +94,8 @@ export default async function scrapeDealsMagnet(page = 1) {
 
         const imgSrc = card.find('.card-img img').attr('data-src') || '';
         const image = imgSrc
-          ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('-s-', '-o-')}`
+          // ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('-s-', '-o-')}`
+          ? `${imgSrc.replace('-s-', '-o-')}`
           : null;
         const storeAlt = card.find('.card-footer img').attr('alt') || '';
         const storeRaw = (cleanText(storeAlt) || '').trim();
