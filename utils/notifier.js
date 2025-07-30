@@ -7,7 +7,7 @@ dotenv.config();
 const TOKEN = process.env.TELEGRAM_BOT_ID;
 const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID;
 const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
-const FACEBOOK_PAGE_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOCKEN;
+const FACEBOOK_PAGE_ACCESS_TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOCKEN;
 
 export async function notifyChannels(deal, buffer) {
   try {
