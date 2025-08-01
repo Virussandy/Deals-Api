@@ -82,7 +82,8 @@ export default async function scrapeDesiDime(page = 1) {
         const imgSrc = el.find('div.deal-box-image img').attr('data-src') || '';
         const image = imgSrc
           // ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('/medium/', '/original/')}`
-          ? `${imgSrc.replace('/medium/', '/original/')}`
+          // ? `${imgSrc.replace('/medium/', '/original/')}`
+          ? `${imgSrc}`
           : null;
         const redirectHref = el.find('div.getdeal a').attr('data-href') || '';
         const redirectUrl = (cleanText(redirectHref) || '').trim();
