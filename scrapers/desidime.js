@@ -1,8 +1,9 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
-import { getBrowser } from '../browser.js';
+import { getBrowser } from '../utils/browserManager.js';
 import { generateDealId } from '../utils/utils.js';
+import logger from '../utils/logger.js'; // Import the new logger
 
 puppeteer.use(StealthPlugin());
 
@@ -35,10 +36,10 @@ async function asyncPool(tasks, limit) {
 }
 
 export default async function scrapeDesiDime(page = 1) {
-  const browser = await getBrowser();
-
+  let tab;
   try {
-    const tab = await browser.newPage();
+    const browser = await getBrowser();
+    tab = await browser.newPage();
     await tab.setRequestInterception(true);
 
     tab.on('request', req => {
@@ -80,23 +81,17 @@ export default async function scrapeDesiDime(page = 1) {
         const store = (cleanText(el.find('div.deal-store.ftl').text()) || '').trim();
 
         const imgSrc = el.find('div.deal-box-image img').attr('data-src') || '';
-        const image = imgSrc
-          // ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('/medium/', '/original/')}`
-          // ? `${imgSrc.replace('/medium/', '/original/')}`
-          ? `${imgSrc}`
-          : null;
+        const image = imgSrc ? `${imgSrc}` : null;
         const redirectHref = el.find('div.getdeal a').attr('data-href') || '';
         const redirectUrl = (cleanText(redirectHref) || '').trim();
 
         const posted = getUTCTimestamp();
 
-        // Skip if essential fields are missing
         if (!title || !store || !redirectUrl) {
-          console.warn(`⚠ Skipping incomplete deal: title=${title}, store=${store}, redirectUrl=${redirectUrl}`);
+          logger.warn('Skipping incomplete DesiDime deal', { title, store, redirectUrl });
           return null;
         }
 
-        // const deal_id = generateDealId(title, store, redirectUrl);
         const deal_id = generateDealId(title,store);
         if (!deal_id) return null;
 
@@ -113,19 +108,19 @@ export default async function scrapeDesiDime(page = 1) {
           url: null,
         };
       } catch (innerErr) {
-        console.error('⚠ Error processing individual DesiDime deal:', innerErr);
+        logger.error('Error processing individual DesiDime deal', { error: innerErr.stack });
         return null;
       }
     });
 
     const deals = await asyncPool(tasks, 1);
-    await tab.close();
-
     return deals.filter(Boolean);
   } catch (err) {
-    console.error('❌ Error parsing DesiDime deals:', err);
+    logger.error('Error parsing DesiDime deals', { error: err.stack });
     return null;
   } finally {
-    await browser.close();
+    if (tab) {
+      await tab.close();
+    }
   }
 }

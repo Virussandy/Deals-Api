@@ -1,14 +1,11 @@
 import express from 'express';
 import admin from '../firebase.js';
+import logger from '../utils/logger.js'; // Import the new logger
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
   const { title, body, imageUrl, data } = req.body;
-
-  if (!data?.deal_id) {
-    return res.status(400).json({ success: false, error: "Missing 'deal_id' in data" });
-  }
 
   const message = {
     notification: {
@@ -28,21 +25,22 @@ router.post('/', async (req, res) => {
     topic: 'all',
   };
 
-  const notificationEntry = {
-    deal_id: data.deal_id,
-    timestamp: new Date().toISOString(),
-  };
-
   try {
-    // ✅ Send FCM notification
     const response = await admin.messaging().send(message);
+    logger.info('FCM notification sent successfully', { fcmResponse: response });
 
-    // ✅ Save to Realtime Database
-    await admin.database().ref(`Notifications/${data.deal_id}`).set(notificationEntry);
+    if (data?.deal_id) {
+      const notificationEntry = {
+        deal_id: data.deal_id,
+        timestamp: admin.database.ServerValue.TIMESTAMP,
+      };
+      await admin.database().ref(`Notifications/${data.deal_id}`).set(notificationEntry);
+      logger.info('Notification entry saved to Realtime DB', { dealId: data.deal_id });
+    }
 
     res.status(200).json({ success: true, fcmResponse: response });
   } catch (error) {
-    console.error('Error:', error);
+    logger.error('Error sending FCM notification:', { error: error.message });
     res.status(500).json({ success: false, error: error.message });
   }
 });

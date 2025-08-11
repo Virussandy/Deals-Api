@@ -1,8 +1,9 @@
 import { URL } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
-
 import dotenv from 'dotenv';
+import { retry } from './network.js'; // Import the new retry utility
+
 dotenv.config();
 
 const api_token = process.env.EARN_KARO_API_KEY;
@@ -10,8 +11,8 @@ const api_token = process.env.EARN_KARO_API_KEY;
 export function normalizeText(text) {
   return text.trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')  // remove all special characters
-    .replace(/\s+/g, ' ')         // collapse multiple spaces to one
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -29,37 +30,17 @@ export function normalizeUrl(url) {
 export function generateDealId(title,store) {
   const normalizedTitle = normalizeText(title);
   const normalizedStore = normalizeText(store);
-  // const normalizedUrl = normalizeUrl(url);
 
   if (!normalizedTitle || !normalizedStore) return null;
-  // if (!normalizedUrl ) return null;
-
-  // Take first 5 words or fewer
-  // const firstWords = normalizedTitle.split(/\s+/).slice(0, 5).join(' ');
 
   const hash = crypto.createHash('sha256');
   hash.update(normalizedTitle + normalizedStore);
-  // hash.update(url);
   return hash.digest('hex');
 }
-
-// export function generateDealId(url) {
-//   if (!url || typeof url !== 'string') return null;
-
-//   // Normalize (optional but recommended)
-//   const normalizedUrl = url.trim().toLowerCase();
-
-//   const hash = crypto.createHash('sha256');
-//   hash.update(normalizedUrl);
-//   return hash.digest('hex');
-// }
-
 
  export function insertOrReplaceMeeshoInvite(url, inviteCode = '384288512', source = 'android_app', campaignId = 'default') {
   try {
     const parsedUrl = new URL(url);
-
-    // Required affiliate params
     const params = parsedUrl.searchParams;
     params.set('af_force_deeplink', 'true');
     params.set('host_internal', 'single_product');
@@ -68,23 +49,23 @@ export function generateDealId(title,store) {
     params.set('af_click_lookback', '7d');
     params.set('af_reengagement_window', '14d');
     params.set('product_name', 'product');
-    params.set('utm_source', source);  // YouTube, Insta, etc.
-    params.set('c', `${inviteCode}:${source}:${campaignId}`); // tracking code
+    params.set('utm_source', source);
+    params.set('c', `${inviteCode}:${source}:${campaignId}`);
 
     parsedUrl.search = params.toString();
     return parsedUrl.toString();
   } catch (e) {
-    return url; // fallback for invalid URLs
+    return url;
   }
 }
 
 export async function convertAffiliateLink(redirectUrl) {
-  try {
-    if (!api_token) {
-      console.error("❌ API token is missing!");
-      return { success: false, reason: "No token" };
-    }
+  if (!api_token) {
+    console.error("❌ API token is missing!");
+    return { success: false, reason: "No token" };
+  }
 
+  const operation = async () => {
     const data = JSON.stringify({
       deal: redirectUrl,
       convert_option: "convert_only"
@@ -93,7 +74,7 @@ export async function convertAffiliateLink(redirectUrl) {
     const config = {
       method: 'post',
       url: 'https://ekaro-api.affiliaters.in/api/converter/public',
-      timeout: 15000, // ⏱️ Max wait time: 10 seconds
+      timeout: 15000,
       headers: {
         'Authorization': `Bearer ${api_token}`,
         'Content-Type': 'application/json'
@@ -109,16 +90,22 @@ export async function convertAffiliateLink(redirectUrl) {
         newUrl: response.data.data
       };
     } else {
+      // Throw an error to trigger a retry for specific, temporary issues.
+      if (response.status >= 500) {
+          throw new Error(`API returned status ${response.status}`);
+      }
       return { success: false, reason: "Invalid response format" };
     }
+  };
+
+  try {
+      // Wrap the API call in our retry utility.
+      return await retry(operation, 3, 2000); // 3 retries, 2-second delay
   } catch (error) {
-    console.error("Affiliate API error:", error?.response?.data || error?.message);
-    return { success: false, reason: "API call failed" };
+    console.error("Affiliate API error after retries:", error?.response?.data || error?.message);
+    return { success: false, reason: "API call failed after multiple attempts" };
   }
 }
-
-
-
 
 export function sanitizeUrl(inputUrl) {
   try {
@@ -130,7 +117,6 @@ export function sanitizeUrl(inputUrl) {
       'cmpid', '_refId', '_appId', 'dealsmagnet.com', 'aod', 'psc', 'admitad_uid', 
       'tagtag_uid', 'referrer', 'af_siteid', 'tsid', 'Aff_Desidime',
       'affinity_int', 'af_tranid', 'af_prt', 'pid', 'c'
-
     ];
 
     for (const param of unwantedParams) {
@@ -160,11 +146,7 @@ export function sanitizeUrl(inputUrl) {
 }
 
 export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs = 30000) {
-  function delay(ms) {
-    return new Promise(res => setTimeout(res, ms));
-  }
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  const operation = async () => {
     let tab;
     try {
       tab = await browser.newPage();
@@ -172,22 +154,26 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
       await tab.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
 
       await tab.goto(redirectUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-      await delay(1000); // buffer for JS redirects
+      await new Promise(res => setTimeout(res, 1000));
 
       const finalUrl = tab.url();
-      await tab.close();
-
+      
       if (finalUrl?.startsWith('http')) {
         return finalUrl.replace('/dealsmagnet.com', '');
       }
-    } catch (err) {
-      console.error(`Attempt ${attempt} failed:`, err.message);
+      // If we didn't get a valid URL, throw an error to trigger a retry.
+      throw new Error('Navigation did not result in a valid http/https URL.');
+    } finally {
       if (tab) {
-        try { await tab.close(); } catch (e) {}
+        await tab.close();
       }
-      if (attempt < retries) await delay(delayMs);
     }
+  };
+  
+  try {
+      return await retry(operation, retries, delayMs);
+  } catch(err) {
+      console.error(`URL resolution failed for ${redirectUrl} after retries.`, err.message);
+      return null;
   }
-
-  return null; // 🚫 Failure explicitly returned
 }

@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
-import { getBrowser } from '../browser.js';
+import { getBrowser } from '../utils/browserManager.js';
 import { generateDealId } from '../utils/utils.js';
+import logger from '../utils/logger.js'; // Import the new logger
 
 function cleanText(text) {
   const trimmed = text?.trim();
@@ -31,10 +32,10 @@ async function asyncPool(tasks, limit) {
 }
 
 export default async function scrapeDealsMagnet(page = 1) {
-  const browser = await getBrowser();
-
+  let tab;
   try {
-    const tab = await browser.newPage();
+    const browser = await getBrowser();
+    tab = await browser.newPage();
     await tab.setRequestInterception(true);
 
     tab.on('request', req => {
@@ -61,7 +62,6 @@ export default async function scrapeDealsMagnet(page = 1) {
 
         const title = (cleanText(card.find('p.card-text a.MainCardAnchore').text()) || '').trim();
 
-        // Redirect URL logic
         let redirectUrl = null;
         const buyButton = card.find('button.buy-button');
         if (buyButton.length > 0) {
@@ -93,10 +93,7 @@ export default async function scrapeDealsMagnet(page = 1) {
         const discount = [discountBig, discountSmall].filter(Boolean).join(' ') || null;
 
         const imgSrc = card.find('.card-img img').attr('data-src') || '';
-        const image = imgSrc
-          // ? `https://deals.sandeepks-jsr.workers.dev/?url=${imgSrc.replace('-s-', '-o-')}`
-          ? `${imgSrc.replace('-s-', '-o-')}`
-          : null;
+        const image = imgSrc ? `${imgSrc.replace('-s-', '-o-')}` : null;
         const storeAlt = card.find('.card-footer img').attr('alt') || '';
         const storeRaw = (cleanText(storeAlt) || '').trim();
         const store = storeRaw ? storeRaw.charAt(0).toUpperCase() + storeRaw.slice(1) : '';
@@ -104,11 +101,10 @@ export default async function scrapeDealsMagnet(page = 1) {
         const postedAgo = getUTCTimestamp();
 
         if (!title || !store || !redirectUrl) {
-          console.warn(`⚠ Skipping incomplete deal: title=${title}, store=${store}, redirectUrl=${redirectUrl}`);
+          logger.warn('Skipping incomplete DealsMagnet deal', { title, store, redirectUrl });
           return null;
         }
 
-        // const deal_id = generateDealId(title, store, redirectUrl);
         const deal_id = generateDealId(title,store);
         if (!deal_id) return null;
 
@@ -125,20 +121,19 @@ export default async function scrapeDealsMagnet(page = 1) {
           url: null,
         };
       } catch (innerErr) {
-        console.error('⚠ Error processing individual deal card:', innerErr);
+        logger.error('Error processing individual deal card', { error: innerErr.stack });
         return null;
       }
     });
 
     const deals = await asyncPool(tasks, 1);
-    await tab.close();
-
     return deals.filter(Boolean);
   } catch (err) {
-    console.error('❌ Error parsing DealsMagnet deals:', err);
+    logger.error('Error parsing DealsMagnet deals', { error: err.stack });
     return null;
   } finally {
-    await browser.close();
+    if (tab) {
+      await tab.close();
+    }
   }
 }
-

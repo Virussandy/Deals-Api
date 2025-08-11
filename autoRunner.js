@@ -1,28 +1,27 @@
 import axios from 'axios';
+import logger from './utils/logger.js'; // Import the new logger
 
-const API_URL = 'http://localhost:5000/deals'; // Replace with your actual API URL
+const API_URL = 'http://localhost:5000/deals';
 
 let isRunning = false;
 
 async function callDealsAPI() {
   if (isRunning) {
-    console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Previous run still in progress. Skipping this call.`);
+    logger.warn('Previous run still in progress. Skipping this call.');
     return;
   }
 
   isRunning = true;
-  console.log(`[${new Date().toLocaleTimeString()}] 🚀 Starting API call...`);
+  logger.info('Starting API call...');
 
   try {
     const response = await axios.post(API_URL);
-    console.log(`[${new Date().toLocaleTimeString()}] ✅ API Success:`, response.data);
+    logger.info('API Success:', { responseData: response.data });
   } catch (error) {
-    console.error(`[${new Date().toLocaleTimeString()}] ❌ API Error:`, error.message);
+    logger.error('API Error:', { error: error.message });
   } finally {
     isRunning = false;
   }
 }
 
-
-// Call every 30 seconds
 setInterval(callDealsAPI, 30 * 1000);

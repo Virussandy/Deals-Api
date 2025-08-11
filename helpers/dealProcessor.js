@@ -1,28 +1,40 @@
 import fs from 'fs/promises';
 import path from 'path';
-import {db,storage} from '../firebase.js';
-import { getBrowser } from '../browser.js';
+import {db} from '../firebase.js';
+import { getBrowser } from '../utils/browserManager.js';
 import { resolveOriginalUrl, sanitizeUrl, convertAffiliateLink } from '../utils/utils.js';
 import dayjs from 'dayjs';
+import { uploadImageFromUrl } from '../utils/uploadImage.js';
+import { notifyChannels } from '../utils/notifier.js';
+import logger from '../utils/logger.js'; // Import the new logger
 
 const CACHE_FILE_PATH = path.resolve('./deals_cache.json');
 
 async function readCache() {
-  try {
-    const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (err) {
-    // If file doesn't exist, return empty
-    return {};
+    try {
+      const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
+      return JSON.parse(data);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+          return {};
+      }
+      throw err;
+    }
   }
-}
-
-async function updateCache(newData) {
-  await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(newData, null, 2));
-}
+  
+  async function updateCache(newData) {
+    const tempPath = CACHE_FILE_PATH + '.tmp';
+    await fs.writeFile(tempPath, JSON.stringify(newData, null, 2));
+    await fs.rename(tempPath, CACHE_FILE_PATH);
+  }
 
 export async function processSourceDeals(fetchDealsFn, page = 1) {
   const deals = await fetchDealsFn(page);
+  if (!deals) {
+      logger.info(`No deals returned from ${fetchDealsFn.name}.`);
+      return { message: 'No deals found', scraped: 0, stored: 0, updated: 0, skipped: 0 };
+  }
+
   const dealMap = new Map();
   const dealIds = [];
 
@@ -33,7 +45,6 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
     }
   }
 
-  // 🔄 Load local cache instead of Firestore
   const cache = await readCache();
   const newDeals = [];
   const dealsToUpdate = [];
@@ -54,27 +65,25 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
     }
   }
 
-    console.log(`🆕 ${newDeals.length} new deals to resolve and store`);
-    console.log(`🕒 ${dealsToUpdate.length} existing deals to update`);
+    logger.info(`${newDeals.length} new deals to resolve and store`);
+    logger.info(`${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
-
-const validDeals = [];
+  const validDeals = [];
 
   for (const deal of [...newDeals, ...dealsToUpdate]) {
-    console.log("\n");
     try {
-      console.log(deal.redirectUrl);
+      logger.info('Processing deal', { redirectUrl: deal.redirectUrl });
       const store = deal.store;
 
       if (store === 'DesiDime') {
-        console.warn(`Skipping deal because store is DesiDime: ${deal.deal_id}`);
+        logger.warn('Skipping deal because store is DesiDime', { dealId: deal.deal_id });
         continue;
       }
 
       if (deal.title && deal.title.includes("18+")) {
-        console.log(`⛔ Skipping 18+ deal: ${deal.title}`);
-        continue; // Skip this deal
+        logger.info('Skipping 18+ deal', { title: deal.title });
+        continue;
       }
 
       if (store === 'Meesho'){
@@ -82,7 +91,12 @@ const validDeals = [];
       }
 
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
-      console.log(resolvedUrl);
+      logger.info('Resolved URL', { resolvedUrl });
+
+      if (!resolvedUrl) {
+        logger.warn('Skipping deal due to failed navigation', { dealId: deal.deal_id });
+        continue;
+      }
 
       deal.redirectUrl = resolvedUrl;
 
@@ -92,7 +106,7 @@ const validDeals = [];
           deal.redirectUrl = affiliateResponse.newUrl;
           const finalUrl = await resolveOriginalUrl(browser, affiliateResponse.newUrl, 1);
           if (!finalUrl) {
-            console.warn(`⏩ Skipping deal due to failed affiliate resolution: ${deal.deal_id}`);
+            logger.warn('Skipping deal due to failed affiliate resolution', { dealId: deal.deal_id });
             continue;
           }
           deal.url = finalUrl;
@@ -102,46 +116,38 @@ const validDeals = [];
           deal.url = redirectedUrl;
         }
       } catch (err) {
-        console.error('Affiliate conversion error:', err.message);
+        logger.error('Affiliate conversion error', { error: err.message });
         deal.url = sanitizeUrl(deal.redirectUrl);
       }
 
-      // delete deal.redirectUrl;
-
-      // Upload image to Firebase Storage if image_url exists
-        const uploadResult = await uploadImageFromUrl(deal.image, deal.deal_id);
-        if (uploadResult && uploadResult.downloadUrl) {
-          deal.image = uploadResult.downloadUrl;
-          await notifyChannels(deal, uploadResult.buffer);
-        } else {
-          continue;
-        }
+      const uploadResult = await uploadImageFromUrl(deal.image, deal.deal_id);
+      if (uploadResult && uploadResult.downloadUrl) {
+        deal.image = uploadResult.downloadUrl;
+        await notifyChannels(deal, uploadResult.buffer);
+      } else {
+        continue;
+      }
   
       validDeals.push(deal);
 
     } catch (err) {
-      console.error('Unexpected deal processing error:', err.message);
+      logger.error('Unexpected deal processing error', { error: err.message });
     }
-    console.log(deal.url);
-    break;
+    logger.info('Final deal URL', { url: deal.url });
   }
-
-
-  await browser.close();
 
   const batch = db.batch();
 
-  // ⬇ Push to Firestore & update cache
   for (const deal of validDeals.reverse()) {
     const dealRef = db.collection('deals').doc(deal.deal_id);
     batch.set(dealRef, deal);
     cache[deal.deal_id] = deal;
   }
 
-  await batch.commit();
-
-  // 🔄 Save the updated cache
-  await updateCache(cache);
+  if (validDeals.length > 0) {
+    await batch.commit();
+    await updateCache(cache);
+  }
 
   return {
     message: 'Deals processed successfully (with local cache)',

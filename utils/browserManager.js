@@ -1,17 +1,18 @@
-// browser.js
+// utils/browserManager.js
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-// import { randomUUID } from 'crypto';
-import path from 'path';
 
-const USER_DATA_DIR = path.resolve('puppeteer-temp');
-
+// Apply the stealth plugin to puppeteer
 puppeteer.use(StealthPlugin());
 
-export const getBrowser = async () => {
-//   const userDataDir = `/tmp/chrome-user-data-${randomUUID()}`;
+// This variable will hold our single browser instance.
+let browserInstance = null;
 
-  const browser = await puppeteer.launch({
+/**
+ * These are the launch options for the Puppeteer browser.
+ * They are configured to be efficient and avoid common issues in a server environment.
+ */
+const launchOptions = {
     headless: 'new',
     args: [
       '--start-minimized',
@@ -50,12 +51,36 @@ export const getBrowser = async () => {
       '--disable-domain-reliability',
       '--disable-sync',
     ],
+};
+
+/**
+ * Gets the shared browser instance. If it doesn't exist or is disconnected,
+ * it launches a new one.
+ * @returns {Promise<import('puppeteer').Browser>} A promise that resolves to the browser instance.
+ */
+export async function getBrowser() {
+  if (browserInstance && browserInstance.isConnected()) {
+    return browserInstance;
+  }
+  console.log('🚀 Launching new browser instance...');
+  browserInstance = await puppeteer.launch(launchOptions);
+
+  // Set up a listener to clear the instance if the browser disconnects.
+  browserInstance.on('disconnected', () => {
+    console.log('Browser disconnected. Cleaning up instance.');
+    browserInstance = null;
   });
 
-  // const pages = await browser.pages();
-  // if (pages.length > 0) {
-  //   await pages[0].close();
-  // }
+  return browserInstance;
+}
 
-  return browser;
-};
+/**
+ * Closes the shared browser instance if it exists.
+ */
+export async function closeBrowser() {
+  if (browserInstance) {
+    console.log('Closing browser instance...');
+    await browserInstance.close();
+    browserInstance = null;
+  }
+}

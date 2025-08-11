@@ -1,30 +1,35 @@
 import express from 'express';
 import desidime from '../scrapers/desidime.js';
 import dealsmagnet from '../scrapers/dealsmagnet.js';
-import {db,storage} from '../firebase.js';
+import {db} from '../firebase.js';
 import { notifyChannels } from '../utils/notifier.js';
 import fs from 'fs/promises';
 import path from 'path';
-import { getBrowser } from '../browser.js';
+import { getBrowser } from '../utils/browserManager.js';
 import {insertOrReplaceMeeshoInvite, resolveOriginalUrl, sanitizeUrl, convertAffiliateLink } from '../utils/utils.js';
 import { uploadImageFromUrl } from '../utils/uploadImage.js';
 import dayjs from 'dayjs';
+import logger from '../utils/logger.js'; // Import the new logger
 
 const router = express.Router();
 const CACHE_FILE_PATH = path.resolve('./deals_cache.json');
-const USER_DATA_DIR = path.resolve('puppeteer-temp');
 
 async function readCache() {
   try {
     const data = await fs.readFile(CACHE_FILE_PATH, 'utf-8');
     return JSON.parse(data);
-  } catch {
-    return {};
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+        return {};
+    }
+    throw error;
   }
 }
 
 async function updateCache(newData) {
-  await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(newData, null, 2));
+    const tempPath = CACHE_FILE_PATH + '.tmp';
+    await fs.writeFile(tempPath, JSON.stringify(newData, null, 2));
+    await fs.rename(tempPath, CACHE_FILE_PATH);
 }
 
 async function processDeals(page = 1) {
@@ -65,33 +70,32 @@ async function processDeals(page = 1) {
     }
   }
 
-  console.log(`🆕 ${newDeals.length} new deals to resolve and store`);
-  console.log(`🕒 ${dealsToUpdate.length} existing deals to update`);
+  logger.info(`${newDeals.length} new deals to resolve and store`);
+  logger.info(`${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
   const validDeals = [];
 
   for (const deal of [...newDeals, ...dealsToUpdate]) {
-    console.log("\n");
     try {
-      console.log(deal.redirectUrl);
+      logger.info('Processing deal', { redirectUrl: deal.redirectUrl });
       const store = deal.store;
       const resolvedUrl = await resolveOriginalUrl(browser, deal.redirectUrl, 1);
-      console.log(resolvedUrl);
+      logger.info('Resolved URL', { resolvedUrl });
 
       if (!resolvedUrl) {
-        console.warn(`⏩ Skipping deal due to failed navigation: ${deal.deal_id}`);
+        logger.warn('Skipping deal due to failed navigation', { dealId: deal.deal_id });
         continue;
       }
 
       if (store === 'DesiDime') {
-        console.warn(`Skipping deal because store is DesiDime: ${deal.deal_id}`);
+        logger.warn('Skipping deal because store is DesiDime', { dealId: deal.deal_id });
         continue;
       }
 
       if (deal.title && deal.title.includes("18+")) {
-        console.log(`⛔ Skipping 18+ deal: ${deal.title}`);
-        continue; // Skip this deal
+        logger.info('Skipping 18+ deal', { title: deal.title });
+        continue;
       }
 
       if (store === 'Meesho'){
@@ -104,11 +108,6 @@ async function processDeals(page = 1) {
         const affiliateResponse = await convertAffiliateLink(deal.redirectUrl);
         if (affiliateResponse.success) {
           deal.redirectUrl = affiliateResponse.newUrl;
-          // const finalUrl = await resolveOriginalUrl(browser, affiliateResponse.newUrl, 1);
-          // if (!finalUrl) {
-          //   console.warn(`⏩ Skipping deal due to failed affiliate resolution: ${deal.deal_id}`);
-          //   continue;
-          // }
           deal.url = deal.redirectUrl;
         } else {
           const redirectedUrl = sanitizeUrl(deal.redirectUrl);
@@ -116,7 +115,7 @@ async function processDeals(page = 1) {
           deal.url = redirectedUrl;
         }
       } catch (err) {
-        console.error('Affiliate conversion error:', err.message);
+        logger.error('Affiliate conversion error:', { error: err.message });
         deal.url = sanitizeUrl(deal.redirectUrl);
       }
 
@@ -131,23 +130,10 @@ async function processDeals(page = 1) {
 
         await notifyChannels(deal, uploadResult.buffer);
   
-      // try {
-      //       await db.collection('deals').doc(deal.deal_id).set(deal);
-      //       cache[deal.deal_id] = deal;
-            // await updateCache(cache);
-      //       await notifyChannels(deal, uploadResult.buffer);
-      //       console.log(`Saved deal ${deal.deal_id}`);
-      //     } catch (err) {
-      //       console.error(`Failed to save deal ${deal.deal_id}:`, err.message);
-      //     }
     } catch (err) {
-      console.error('Unexpected deal processing error:', err.message);
+      logger.error('Unexpected deal processing error', { error: err.message });
     }
-    // console.log(deal.url);
   }
-
-  await browser.close();
-  await fs.rm(USER_DATA_DIR, { recursive: true, force: true });
 
   const batch = db.batch();
 
@@ -155,11 +141,12 @@ async function processDeals(page = 1) {
     const dealRef = db.collection('deals').doc(deal.deal_id);
     batch.set(dealRef, deal);
     cache[deal.deal_id] = deal;
-    // notifyChannels(deal).catch(e => console.error('Notify failed', e));
   }
 
-    await batch.commit();
-    await updateCache(cache);
+    if (validDeals.length > 0) {
+        await batch.commit();
+        await updateCache(cache);
+    }
 
   return {
     message: 'Deals processed successfully',
@@ -177,7 +164,7 @@ router.get('/', async (req, res) => {
     const result = await processDeals(page);
     res.status(200).json(result);
   } catch (error) {
-    console.error('🔥 Error in GET:', error);
+    logger.error('Error in GET /deals', { error: error.stack });
     res.status(500).json({ error: 'Failed to fetch deals' });
   }
 });
@@ -187,7 +174,7 @@ router.post('/', async (req, res) => {
     const result = await processDeals(1);
     res.status(200).json(result);
   } catch (error) {
-    console.error('🔥 Error in POST:', error);
+    logger.error('Error in POST /deals', { error: error.stack });
     res.status(500).json({ error: 'Failed to process deals from Pub/Sub' });
   }
 });
