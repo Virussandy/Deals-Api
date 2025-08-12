@@ -1,24 +1,25 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Set the mode based on the NODE_ENV environment variable, or default to development
+const appMode = process.env.NODE_ENV || 'development';
 
-const appMode = 'production';
-const envFileName = `.env.${appMode}`;
-const envPath = path.resolve(process.cwd(), envFileName);
+// Only try to load .env files in development
+if (appMode === 'development') {
+  const envFileName = `.env.${appMode}`;
+  const envPath = path.resolve(process.cwd(), envFileName);
 
-console.log(`Attempting to load configuration from: ${envFileName}`);
+  console.log(`Attempting to load configuration from: ${envFileName}`);
+  const result = dotenv.config({ path: envPath });
 
-const result = dotenv.config({ path: envPath });
-
-if (result.error) {
-  console.error(`FATAL ERROR: Could not find the required configuration file: ${envFileName}`);
-  console.error('For local development, ensure you have a .env.development file.');
-  console.error('For production, ensure the APP_MODE environment variable is set correctly.');
-  process.exit(1);
-} else {
-  console.log(`Successfully loaded configuration from: ${envFileName}`);
+  if (result.error) {
+    console.error(`FATAL ERROR: Could not find the required configuration file: ${envFileName}`);
+    console.error('For local development, ensure you have a .env.development file.');
+    process.exit(1);
+  } else {
+    console.log(`Successfully loaded configuration from: ${envFileName}`);
+  }
 }
-
 
 // Ensure SERVER_ID is set, as it's critical for the round-robin scheduler.
 if (!process.env.SERVER_ID) {
