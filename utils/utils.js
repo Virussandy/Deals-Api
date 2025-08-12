@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { retry } from './network.js';
 import logger from './logger.js';
-import config from '../config.js'; // Import the new config
+import config from '../config.js';
 
 export function normalizeText(text) {
   return text.trim()

@@ -5,7 +5,6 @@ import dealsRouter from './routes/deals.js';
 import desidimeRouter from './routes/desidime.js';
 import dealsmagnetRouter from './routes/dealsmagnet.js';
 import notificationRouter from './routes/notification.js';
-import { closeBrowser } from './utils/browserManager.js';
 import logger from './utils/logger.js';
 
 const app = express();
@@ -25,10 +24,8 @@ const server = app.listen(PORT, () => {
 async function gracefulShutdown(signal) {
   logger.info(`Received ${signal}. Starting graceful shutdown...`);
   
-  server.close(async () => {
-    logger.info('HTTP server closed.');
-    await closeBrowser();
-    logger.info('Shutdown complete.');
+  server.close(() => {
+    logger.info('HTTP server closed. Shutdown complete.');
     process.exit(0);
   });
 

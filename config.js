@@ -9,15 +9,21 @@ const envPath = path.resolve(process.cwd(), `.env.${env}`);
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {
-  // This will fail gracefully if the file doesn't exist,
-  // which is fine if you set environment variables directly.
   console.log(`Note: Could not find ${envPath} file, relying on system environment variables.`);
+}
+
+// Ensure SERVER_ID is set, as it's critical for the round-robin scheduler.
+if (!process.env.SERVER_ID) {
+  console.error("FATAL ERROR: SERVER_ID environment variable is not set. Please assign a unique ID to this server instance (e.g., 'server_1').");
+  process.exit(1);
 }
 
 // Export all the configuration variables
 export default {
   env,
   port: process.env.PORT,
+  // This is the unique, static ID for this server instance.
+  serverId: process.env.SERVER_ID,
   earnKaroApiKey: process.env.EARN_KARO_API_KEY,
   telegram: {
     botId: process.env.TELEGRAM_BOT_ID,
@@ -30,7 +36,6 @@ export default {
   firebase: {
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     databaseURL: process.env.FIREBASE_DB_URL,
-    // The key file is also environment-specific now
     keyFilename: path.resolve(process.cwd(), `firebaseKey.${env}.json`),
   },
 };

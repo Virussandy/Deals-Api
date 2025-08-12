@@ -1,7 +1,6 @@
 import * as cheerio from 'cheerio';
-import { getBrowser } from '../utils/browserManager.js';
 import { generateDealId } from '../utils/utils.js';
-import logger from '../utils/logger.js'; // Import the new logger
+import logger from '../utils/logger.js';
 
 function cleanText(text) {
   const trimmed = text?.trim();
@@ -31,10 +30,9 @@ async function asyncPool(tasks, limit) {
   return Promise.all(results);
 }
 
-export default async function scrapeDealsMagnet(page = 1) {
+export default async function scrapeDealsMagnet(browser, page = 1) {
   let tab;
   try {
-    const browser = await getBrowser();
     tab = await browser.newPage();
     await tab.setRequestInterception(true);
 

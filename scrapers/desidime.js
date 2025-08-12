@@ -1,9 +1,8 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as cheerio from 'cheerio';
-import { getBrowser } from '../utils/browserManager.js';
 import { generateDealId } from '../utils/utils.js';
-import logger from '../utils/logger.js'; // Import the new logger
+import logger from '../utils/logger.js';
 
 puppeteer.use(StealthPlugin());
 
@@ -35,10 +34,9 @@ async function asyncPool(tasks, limit) {
   return Promise.all(results);
 }
 
-export default async function scrapeDesiDime(page = 1) {
+export default async function scrapeDesiDime(browser, page = 1) {
   let tab;
   try {
-    const browser = await getBrowser();
     tab = await browser.newPage();
     await tab.setRequestInterception(true);
 
