@@ -21,7 +21,7 @@ async function readCache() {
       throw err;
     }
   }
-  
+
   async function updateCache(newData) {
     const tempPath = CACHE_FILE_PATH + '.tmp';
     await fs.writeFile(tempPath, JSON.stringify(newData, null, 2));
@@ -47,31 +47,19 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
 
   const cache = await readCache();
   const newDeals = [];
-  const dealsToUpdate = [];
 
   for (const id of dealIds) {
-    const deal = dealMap.get(id);
-    const cachedDeal = cache[id];
-
-    if (!cachedDeal) {
-      newDeals.push(deal);
-    } else {
-      const existingPostedOn = dayjs(cachedDeal.posted_on);
-      const newPostedOn = dayjs(deal.posted_on);
-      const diffHours = Math.abs(newPostedOn.diff(existingPostedOn, 'hour'));
-      if (diffHours > 24) {
-        dealsToUpdate.push(deal);
-      }
+    if (!cache[id]) {
+      newDeals.push(dealMap.get(id));
     }
   }
 
   logger.info(`${newDeals.length} new deals to resolve and store`);
-  logger.info(`${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
   const validDealsToNotify = [];
 
-  for (const deal of [...newDeals, ...dealsToUpdate]) {
+  for (const deal of newDeals) {
     try {
       logger.info('Processing deal', { redirectUrl: deal.redirectUrl });
       const store = deal.store;
@@ -127,7 +115,7 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
       } else {
         continue;
       }
-  
+
     } catch (err) {
       logger.error('Unexpected deal processing error', { error: err.message });
     }
@@ -139,14 +127,14 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
     for (const { deal } of validDealsToNotify) {
         const dealRef = db.collection('deals').doc(deal.deal_id);
         batch.set(dealRef, deal);
-        cache[deal.deal_id] = deal;
+        cache[deal.deal_id] = true;
     }
 
     logger.info(`Committing ${validDealsToNotify.length} deals to the database.`);
     await batch.commit();
     await updateCache(cache);
     logger.info('Database and cache have been updated.');
-    
+
     logger.info('Starting to send notifications...');
     for (const { deal, buffer } of validDealsToNotify) {
         await notifyChannels(deal, buffer);
@@ -159,7 +147,7 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
     message: 'Deals processed successfully (with local cache)',
     scraped: deals.length,
     stored: newDeals.length,
-    updated: dealsToUpdate.length,
-    skipped: deals.length - (newDeals.length + dealsToUpdate.length),
+    updated: 0,
+    skipped: deals.length - newDeals.length,
   };
 }
