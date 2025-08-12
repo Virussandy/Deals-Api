@@ -6,7 +6,7 @@ import notificationRouter from './routes/notification.js';
 import logger from './utils/logger.js';
 
 const app = express();
-const PORT = config.port || 8080;
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 
