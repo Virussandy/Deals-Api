@@ -1,27 +1,22 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Determine the environment ('production' or 'development')
-const env = process.env.NODE_ENV || 'production';
 
-// --- Universal Environment Variable Loading ---
-// In production, we'll load all variables from a single DOTENV_CONTENTS variable.
-// In development, we'll load from the .env.development file.
-if (env === 'production' && process.env.DOTENV_CONTENTS) {
-  console.log('Loading environment variables from DOTENV_CONTENTS...');
-  // The dotenv.parse method reads a string and returns an object of variables
-  const parsed = dotenv.parse(Buffer.from(process.env.DOTENV_CONTENTS, 'utf-8'));
-  // We then merge these parsed variables into the global process.env object
-  for (const key in parsed) {
-    if (Object.prototype.hasOwnProperty.call(parsed, key)) {
-      process.env[key] = parsed[key];
-    }
-  }
+const appMode = 'production';
+const envFileName = `.env.${appMode}`;
+const envPath = path.resolve(process.cwd(), envFileName);
+
+console.log(`Attempting to load configuration from: ${envFileName}`);
+
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error(`FATAL ERROR: Could not find the required configuration file: ${envFileName}`);
+  console.error('For local development, ensure you have a .env.development file.');
+  console.error('For production, ensure the APP_MODE environment variable is set correctly.');
+  process.exit(1);
 } else {
-  // This is the fallback for local development
-  console.log('Loading environment variables from .env.development file...');
-  const envPath = path.resolve(process.cwd(), '.env.development');
-  dotenv.config({ path: envPath });
+  console.log(`Successfully loaded configuration from: ${envFileName}`);
 }
 
 
@@ -33,7 +28,8 @@ if (!process.env.SERVER_ID) {
 
 // Export all the configuration variables
 export default {
-  env,
+  // We export the mode we are running in for potential use elsewhere
+  env: appMode,
   port: process.env.PORT,
   serverId: process.env.SERVER_ID,
   earnKaroApiKey: process.env.EARN_KARO_API_KEY,

@@ -113,7 +113,6 @@ export async function processDeals(page = 1) {
             } catch (err) {
                 logger.error('Unexpected deal processing error', { error: err.message });
             }
-            break;
         }
 
         if (validDealsToNotify.length > 0) {
