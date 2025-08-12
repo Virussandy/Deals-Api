@@ -2,8 +2,6 @@
 import config from './config.js'; 
 import express from 'express';
 import dealsRouter from './routes/deals.js';
-import desidimeRouter from './routes/desidime.js';
-import dealsmagnetRouter from './routes/dealsmagnet.js';
 import notificationRouter from './routes/notification.js';
 import logger from './utils/logger.js';
 
@@ -13,8 +11,6 @@ const PORT = config.port || 8080;
 app.use(express.json());
 
 app.use('/deals', dealsRouter);
-app.use('/desidime', desidimeRouter);
-app.use('/dealsmagnet', dealsmagnetRouter);
 app.use('/notifications', notificationRouter);
 
 const server = app.listen(PORT, () => {
