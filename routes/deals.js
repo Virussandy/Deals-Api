@@ -9,7 +9,7 @@ import { getBrowser } from '../utils/browserManager.js';
 import {insertOrReplaceMeeshoInvite, resolveOriginalUrl, sanitizeUrl, convertAffiliateLink } from '../utils/utils.js';
 import { uploadImageFromUrl } from '../utils/uploadImage.js';
 import dayjs from 'dayjs';
-import logger from '../utils/logger.js'; // Import the new logger
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 const CACHE_FILE_PATH = path.resolve('./deals_cache.json');
@@ -74,7 +74,8 @@ async function processDeals(page = 1) {
   logger.info(`${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
-  const validDeals = [];
+  // We'll store deals and their image buffers here to notify *after* saving.
+  const validDealsToNotify = [];
 
   for (const deal of [...newDeals, ...dealsToUpdate]) {
     try {
@@ -119,35 +120,42 @@ async function processDeals(page = 1) {
         deal.url = sanitizeUrl(deal.redirectUrl);
       }
 
-        const uploadResult = await uploadImageFromUrl(deal.image, deal.deal_id);
-        if (uploadResult && uploadResult.downloadUrl) {
-          deal.image = uploadResult.downloadUrl;
-        } else {
-          continue;
-        }
-
-        validDeals.push(deal);
-
-        await notifyChannels(deal, uploadResult.buffer);
+      const uploadResult = await uploadImageFromUrl(deal.image, deal.deal_id);
+      if (uploadResult && uploadResult.downloadUrl) {
+        deal.image = uploadResult.downloadUrl;
+        // Store the deal and its buffer for later.
+        validDealsToNotify.push({ deal, buffer: uploadResult.buffer });
+      } else {
+        continue;
+      }
   
     } catch (err) {
       logger.error('Unexpected deal processing error', { error: err.message });
     }
-    break;
   }
 
-  const batch = db.batch();
-
-  for (const deal of validDeals.reverse()) {
-    const dealRef = db.collection('deals').doc(deal.deal_id);
-    batch.set(dealRef, deal);
-    cache[deal.deal_id] = deal;
-  }
-
-    if (validDeals.length > 0) {
-        await batch.commit();
-        await updateCache(cache);
+  // --- Step 1: Write to Database and Cache ---
+  if (validDealsToNotify.length > 0) {
+    const batch = db.batch();
+    for (const { deal } of validDealsToNotify) {
+      const dealRef = db.collection('deals').doc(deal.deal_id);
+      batch.set(dealRef, deal);
+      cache[deal.deal_id] = deal;
     }
+    
+    logger.info(`Committing ${validDealsToNotify.length} deals to the database.`);
+    await batch.commit();
+    await updateCache(cache);
+    logger.info('Database and cache have been updated.');
+
+    // --- Step 2: Send Notifications (ONLY after successful write) ---
+    logger.info('Starting to send notifications...');
+    for (const { deal, buffer } of validDealsToNotify) {
+        await notifyChannels(deal, buffer);
+    }
+  } else {
+      logger.info('No new valid deals to save or notify.');
+  }
 
   return {
     message: 'Deals processed successfully',

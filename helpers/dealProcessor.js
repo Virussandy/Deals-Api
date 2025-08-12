@@ -6,7 +6,7 @@ import { resolveOriginalUrl, sanitizeUrl, convertAffiliateLink } from '../utils/
 import dayjs from 'dayjs';
 import { uploadImageFromUrl } from '../utils/uploadImage.js';
 import { notifyChannels } from '../utils/notifier.js';
-import logger from '../utils/logger.js'; // Import the new logger
+import logger from '../utils/logger.js';
 
 const CACHE_FILE_PATH = path.resolve('./deals_cache.json');
 
@@ -65,11 +65,11 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
     }
   }
 
-    logger.info(`${newDeals.length} new deals to resolve and store`);
-    logger.info(`${dealsToUpdate.length} existing deals to update`);
+  logger.info(`${newDeals.length} new deals to resolve and store`);
+  logger.info(`${dealsToUpdate.length} existing deals to update`);
 
   const browser = await getBrowser();
-  const validDeals = [];
+  const validDealsToNotify = [];
 
   for (const deal of [...newDeals, ...dealsToUpdate]) {
     try {
@@ -102,7 +102,7 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
 
       try {
         const affiliateResponse = await convertAffiliateLink(deal.redirectUrl);
-        if (affiliateResponse.success) {
+        if ( affiliateResponse.success) {
           deal.redirectUrl = affiliateResponse.newUrl;
           const finalUrl = await resolveOriginalUrl(browser, affiliateResponse.newUrl, 1);
           if (!finalUrl) {
@@ -123,30 +123,36 @@ export async function processSourceDeals(fetchDealsFn, page = 1) {
       const uploadResult = await uploadImageFromUrl(deal.image, deal.deal_id);
       if (uploadResult && uploadResult.downloadUrl) {
         deal.image = uploadResult.downloadUrl;
-        await notifyChannels(deal, uploadResult.buffer);
+        validDealsToNotify.push({ deal, buffer: uploadResult.buffer });
       } else {
         continue;
       }
   
-      validDeals.push(deal);
-
     } catch (err) {
       logger.error('Unexpected deal processing error', { error: err.message });
     }
     logger.info('Final deal URL', { url: deal.url });
   }
 
-  const batch = db.batch();
+  if (validDealsToNotify.length > 0) {
+    const batch = db.batch();
+    for (const { deal } of validDealsToNotify) {
+        const dealRef = db.collection('deals').doc(deal.deal_id);
+        batch.set(dealRef, deal);
+        cache[deal.deal_id] = deal;
+    }
 
-  for (const deal of validDeals.reverse()) {
-    const dealRef = db.collection('deals').doc(deal.deal_id);
-    batch.set(dealRef, deal);
-    cache[deal.deal_id] = deal;
-  }
-
-  if (validDeals.length > 0) {
+    logger.info(`Committing ${validDealsToNotify.length} deals to the database.`);
     await batch.commit();
     await updateCache(cache);
+    logger.info('Database and cache have been updated.');
+    
+    logger.info('Starting to send notifications...');
+    for (const { deal, buffer } of validDealsToNotify) {
+        await notifyChannels(deal, buffer);
+    }
+  } else {
+      logger.info('No new valid deals to save or notify.');
   }
 
   return {
