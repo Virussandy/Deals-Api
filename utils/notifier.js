@@ -1,78 +1,67 @@
 import axios from 'axios';
 import FormData from 'form-data';
-import dotenv from 'dotenv';
 import { canPostToFacebook, updatePostMeta } from './facebookUtils.js';
-import { retry } from './network.js'; // Import the new retry utility
-
-dotenv.config();
-const TOKEN = process.env.TELEGRAM_BOT_ID;
-const CHAT_ID = process.env.TELEGRAM_CHANNEL_ID;
-const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
-const FACEBOOK_PAGE_ACCESS_TOKEN = process.env.FACEBOOK_PAGE_ACCESS_TOCKEN;
+import { retry } from './network.js';
+import logger from './logger.js';
+import config from '../config.js'; // Import the new config
 
 export async function notifyChannels(deal, buffer) {
   try {
-    // Await all notifications, they can run in parallel.
     await Promise.all([
         sendToTelegram(buffer, deal),
         sendToFacebook(buffer, deal)
-        // Add other channels here, e.g., sendToWhatsApp(buffer, deal)
     ]);
 
-    console.log(`✅ Sent to all channels for deal ${deal.deal_id}`);
+    logger.info('Sent to all channels for deal', { dealId: deal.deal_id });
   } catch (err) {
-    console.error(`❌ Failed to notify all channels for deal ${deal.deal_id}:`, err.message);
+    logger.error('Failed to notify all channels for deal', { dealId: deal.deal_id, error: err.message });
   }
 }
 
 async function sendToTelegram(buffer, deal) {
   const operation = async () => {
     const form = new FormData();
-    form.append('chat_id', CHAT_ID);
+    form.append('chat_id', config.telegram.channelId);
     form.append('photo', buffer, { filename: `${deal.deal_id}.jpg` });
     form.append('caption', `${deal.title}\nPrice: ${deal.price}\nStore: ${deal.store}\n${deal.redirectUrl}`);
     
-    await axios.post(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, form, { headers: form.getHeaders() });
-    console.log(`✅ Telegram notification sent for: ${deal.title}`);
+    await axios.post(`https://api.telegram.org/bot${config.telegram.botId}/sendPhoto`, form, { headers: form.getHeaders() });
+    logger.info('Telegram notification sent', { title: deal.title });
   };
 
   try {
-    // Wrap the Telegram post in our retry utility.
-    await retry(operation, 2, 2000); // 2 retries, 2-second delay
+    await retry(operation, 2, 2000);
   } catch (err) {
-      console.error('❌ Error posting to Telegram after retries:', err.response?.data || err.message);
-      // Re-throw the error so Promise.all in notifyChannels can catch it if needed.
+      logger.error('Error posting to Telegram after retries', { error: err.response?.data || err.message });
       throw err;
   }
 }
 
 async function sendToFacebook(buffer, deal) {
   if (!(await canPostToFacebook())) {
-      console.log('⏩ Skipping Facebook post due to rate limiting.');
+      logger.info('Skipping Facebook post due to rate limiting.');
       return;
   }
 
   const operation = async () => {
     const form = new FormData();
-    form.append('access_token', FACEBOOK_PAGE_ACCESS_TOKEN);
+    form.append('access_token', config.facebook.accessToken);
     form.append('source', buffer, { filename: `${deal.deal_id}.jpg` });
     form.append('caption', `${deal.redirectUrl}\n${deal.price}\n${deal.title}`);
 
     const response = await axios.post(
-      `https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`,
+      `https://graph.facebook.com/v18.0/${config.facebook.pageId}/photos`,
       form,
       { headers: form.getHeaders() }
     );
-    console.log(`✅ Facebook post successful: ID = ${response.data.post_id || response.data.id}`);
+    logger.info('Facebook post successful', { postId: response.data.post_id || response.data.id });
   };
 
   try {
-    // Wrap the Facebook post in our retry utility.
-    await retry(operation, 2, 3000); // 2 retries, 3-second delay
+    await retry(operation, 2, 3000);
     await updatePostMeta();
   } catch (err) {
-    console.error('❌ Error posting to Facebook after retries:', err.response?.data || err.message);
-    // Re-throw the error.
+    logger.error('Error posting to Facebook after retries', { error: err.response?.data || err.message });
     throw err;
   }
 }

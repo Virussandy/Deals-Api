@@ -1,12 +1,9 @@
 import { URL } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
-import dotenv from 'dotenv';
-import { retry } from './network.js'; // Import the new retry utility
-
-dotenv.config();
-
-const api_token = process.env.EARN_KARO_API_KEY;
+import { retry } from './network.js';
+import logger from './logger.js';
+import config from '../config.js'; // Import the new config
 
 export function normalizeText(text) {
   return text.trim()
@@ -60,8 +57,8 @@ export function generateDealId(title,store) {
 }
 
 export async function convertAffiliateLink(redirectUrl) {
-  if (!api_token) {
-    console.error("❌ API token is missing!");
+  if (!config.earnKaroApiKey) {
+    logger.error('EarnKaro API key is missing!');
     return { success: false, reason: "No token" };
   }
 
@@ -71,18 +68,18 @@ export async function convertAffiliateLink(redirectUrl) {
       convert_option: "convert_only"
     });
 
-    const config = {
+    const axiosConfig = {
       method: 'post',
       url: 'https://ekaro-api.affiliaters.in/api/converter/public',
       timeout: 15000,
       headers: {
-        'Authorization': `Bearer ${api_token}`,
+        'Authorization': `Bearer ${config.earnKaroApiKey}`,
         'Content-Type': 'application/json'
       },
       data: data
     };
 
-    const response = await axios(config);
+    const response = await axios(axiosConfig);
 
     if (response.data?.success === 1 && response.data?.data?.startsWith("http")) {
       return {
@@ -90,7 +87,6 @@ export async function convertAffiliateLink(redirectUrl) {
         newUrl: response.data.data
       };
     } else {
-      // Throw an error to trigger a retry for specific, temporary issues.
       if (response.status >= 500) {
           throw new Error(`API returned status ${response.status}`);
       }
@@ -99,10 +95,9 @@ export async function convertAffiliateLink(redirectUrl) {
   };
 
   try {
-      // Wrap the API call in our retry utility.
-      return await retry(operation, 3, 2000); // 3 retries, 2-second delay
+      return await retry(operation, 3, 2000);
   } catch (error) {
-    console.error("Affiliate API error after retries:", error?.response?.data || error?.message);
+    logger.error("Affiliate API error after retries", { error: error?.response?.data || error?.message });
     return { success: false, reason: "API call failed after multiple attempts" };
   }
 }
@@ -135,7 +130,7 @@ export function sanitizeUrl(inputUrl) {
 
         parsedUrl.searchParams.set('openid.return_to', nestedUrl.toString());
       } catch (err) {
-        console.warn(`Failed nested openid.return_to in: ${inputUrl}`);
+        logger.warn('Failed nested openid.return_to', { url: inputUrl });
       }
     }
 
@@ -161,7 +156,6 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
       if (finalUrl?.startsWith('http')) {
         return finalUrl.replace('/dealsmagnet.com', '');
       }
-      // If we didn't get a valid URL, throw an error to trigger a retry.
       throw new Error('Navigation did not result in a valid http/https URL.');
     } finally {
       if (tab) {
@@ -173,7 +167,7 @@ export async function resolveOriginalUrl(browser, redirectUrl, retries, delayMs 
   try {
       return await retry(operation, retries, delayMs);
   } catch(err) {
-      console.error(`URL resolution failed for ${redirectUrl} after retries.`, err.message);
+      logger.error('URL resolution failed after retries', { url: redirectUrl, error: err.message });
       return null;
   }
 }

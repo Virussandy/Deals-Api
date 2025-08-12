@@ -1,15 +1,15 @@
+// The first import should be your config to load environment variables
+import config from './config.js'; 
 import express from 'express';
-import dotenv from 'dotenv';
 import dealsRouter from './routes/deals.js';
 import desidimeRouter from './routes/desidime.js';
 import dealsmagnetRouter from './routes/dealsmagnet.js';
 import notificationRouter from './routes/notification.js';
 import { closeBrowser } from './utils/browserManager.js';
-import logger from './utils/logger.js'; // Import the new logger
+import logger from './utils/logger.js';
 
-dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = config.port || 8080;
 
 app.use(express.json());
 
@@ -19,7 +19,7 @@ app.use('/dealsmagnet', dealsmagnetRouter);
 app.use('/notifications', notificationRouter);
 
 const server = app.listen(PORT, () => {
-  logger.info(`Server running on http://localhost:${PORT}`);
+  logger.info(`Server running in ${config.env} mode on http://localhost:${PORT}`);
 });
 
 async function gracefulShutdown(signal) {

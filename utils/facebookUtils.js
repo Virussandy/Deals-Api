@@ -1,12 +1,9 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
 import dayjs from 'dayjs';
+import { db, FieldValue } from '../firebase.js';
+import logger from './logger.js';
+import config from '../config.js'; // Import the new config
 
-import { db, storage, FieldValue  } from '../firebase.js';
-
-dotenv.config();
-const FACEBOOK_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
-const FACEBOOK_PAGE_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOCKEN;
 const MIN_POST_GAP_MINUTES = 15;
 
 export async function canPostToFacebook() {
@@ -27,7 +24,9 @@ export async function canPostToFacebook() {
     return true;
   }
 
-  console.warn(`⏳ Waiting: Only ${now.diff(lastPost, 'minute')} min since last post.`);
+  logger.warn('Facebook post skipped due to rate limiting.', { 
+      minutesSinceLastPost: now.diff(lastPost, 'minute') 
+  });
   return false;
 }
 
@@ -39,14 +38,13 @@ export async function updatePostMeta() {
   });
 }
 
-
 export async function getAllFacebookPostIds(limit = 100) {
   try {
     const response = await axios.get(
-      `https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/posts`,
+      `https://graph.facebook.com/v18.0/${config.facebook.pageId}/posts`,
       {
         params: {
-          access_token: FACEBOOK_PAGE_ACCESS_TOKEN,
+          access_token: config.facebook.accessToken,
           limit,
         },
       }
@@ -54,10 +52,10 @@ export async function getAllFacebookPostIds(limit = 100) {
 
     const posts = response.data?.data || [];
     const postIds = posts.map(post => post.id);
-    console.log(`📥 Found ${postIds.length} post(s).`);
+    logger.info(`Found ${postIds.length} Facebook post(s).`);
     return postIds;
   } catch (err) {
-    console.error('❌ Failed to fetch posts:', err.response?.data || err.message);
+    logger.error('Failed to fetch Facebook posts', { error: err.response?.data || err.message });
     return [];
   }
 }
@@ -68,14 +66,14 @@ export async function deleteFacebookPost(postId) {
       `https://graph.facebook.com/v18.0/${postId}`,
       {
         params: {
-          access_token: FACEBOOK_PAGE_ACCESS_TOKEN,
+          access_token: config.facebook.accessToken,
         },
       }
     );
-    console.log(`🗑️ Deleted Facebook post: ${postId}`);
+    logger.info(`Deleted Facebook post: ${postId}`);
     return true;
   } catch (err) {
-    console.error(`❌ Failed to delete post ${postId}:`, err.response?.data || err.message);
+    logger.error(`Failed to delete Facebook post ${postId}`, { error: err.response?.data || err.message });
     return false;
   }
 }
