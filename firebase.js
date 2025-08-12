@@ -1,45 +1,44 @@
 import admin from 'firebase-admin';
-import { createRequire } from 'module';
 import config from './config.js';
 import logger from './utils/logger.js';
-import fs from 'fs/promises';
-import path from 'path';
 
-const require = createRequire(import.meta.url);
-const keyFilename = path.resolve(process.cwd(), `firebaseKey.${config.env}.json`);
+try {
+  // Construct the service account object directly from environment variables
+  const serviceAccount = {
+    type: process.env.FIREBASE_TYPE,
+    project_id: process.env.FIREBASE_PROJECT_ID,
+    private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+    // When using .env files, the private key needs to be parsed correctly
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    client_id: process.env.FIREBASE_CLIENT_ID,
+    auth_uri: process.env.FIREBASE_AUTH_URI,
+    token_uri: process.env.FIREBASE_TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+    client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+  };
 
-// This is an immediately-invoked async function to set up Firebase.
-// It runs once when the application starts.
-(async () => {
-  try {
-    // In production, the key comes from an environment variable set by Secret Manager.
-    // We write it to a file so the rest of the app can use it normally.
-    if (config.env === 'production' && process.env.FIREBASE_KEY_JSON) {
-      logger.info('Found FIREBASE_KEY_JSON env var. Writing to key file for initialization.');
-      await fs.writeFile(keyFilename, process.env.FIREBASE_KEY_JSON);
-    }
-
-    // Now, require the file which either existed (for local dev) or was just created.
-    const serviceAccount = require(keyFilename);
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      storageBucket: config.firebase.storageBucket,
-      databaseURL: config.firebase.databaseURL,
-    });
-
-    logger.info('Firebase Admin SDK initialized successfully.');
-
-  } catch (error) {
-    logger.error('CRITICAL: Firebase initialization failed.', {
-      error: error.message,
-      hasEnvVar: !!process.env.FIREBASE_KEY_JSON,
-    });
-    // If Firebase can't start, the app is useless. Exit immediately.
-    process.exit(1);
+  console.log(serviceAccount.project_id);
+  // Check if all required keys are present
+  if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+    throw new Error('Missing required Firebase credential environment variables.');
   }
-})();
 
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: config.firebase.storageBucket,
+    databaseURL: config.firebase.databaseURL,
+  });
+
+  logger.info('Firebase Admin SDK initialized successfully from environment variables.');
+
+} catch (error) {
+  logger.error('CRITICAL: Firebase initialization failed.', {
+    error: error.message,
+  });
+  // If Firebase can't start, the app is useless. Exit immediately.
+  process.exit(1);
+}
 
 export const db = admin.firestore();
 export const rtdb = admin.database();
